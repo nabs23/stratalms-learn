@@ -97,4 +97,30 @@ class ApiService {
       return null;
     }
   }
+
+  // Get dashboard stats
+  Future<Map<String, dynamic>?> getDashboardStats() async {
+    final token = await getToken();
+    if (token == null) return null;
+
+    final url = Uri.parse('${AppConstants.baseUrl}/api/student/dashboard/stats');
+
+    try {
+      final response = await http.get(
+        url,
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Get dashboard stats error: $e');
+      return null;
+    }
+  }
 }
