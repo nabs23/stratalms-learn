@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
-import 'login_screen.dart';
+import '../utils/responsive.dart';
+import '../constants/app_constants.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -24,7 +25,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _loadData() async {
     final user = await _apiService.getUser();
     final stats = await _apiService.getDashboardStats();
-    
+
     if (mounted) {
       setState(() {
         _user = user;
@@ -34,7 +35,12 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-
+  String _getImageUrl(String? imagePath) {
+    if (imagePath == null || imagePath.isEmpty) return '';
+    if (imagePath.startsWith('http')) return imagePath;
+    final prefix = imagePath.startsWith('/') ? '' : '/';
+    return '${AppConstants.baseUrl}$prefix$imagePath';
+  }
 
   Widget _buildSectionHeader(String title) {
     return Text(
@@ -86,7 +92,11 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               child: SafeArea(
                 child: Padding(
-                  padding: const EdgeInsets.only(left: 24.0, right: 24.0, bottom: 20.0),
+                  padding: const EdgeInsets.only(
+                    left: 24.0,
+                    right: 24.0,
+                    bottom: 20.0,
+                  ),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.end,
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -119,28 +129,53 @@ class _HomeScreenState extends State<HomeScreen> {
           );
         },
       ),
-
     );
   }
 
   Widget _buildOverviewGrid(Map<String, dynamic> overview) {
+    int columns = Responsive.isTablet(context) ? 4 : 2;
     return GridView.count(
-      crossAxisCount: 2,
+      crossAxisCount: columns,
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       crossAxisSpacing: 16,
       mainAxisSpacing: 16,
-      childAspectRatio: 1.3,
+      childAspectRatio: 1.4,
       children: [
-        _buildStatCard('Enrollments', overview['total_enrollments'].toString(), Icons.menu_book_rounded, Colors.blue),
-        _buildStatCard('Active', overview['active_courses'].toString(), Icons.play_circle_fill_rounded, Colors.orange),
-        _buildStatCard('Avg Progress', '${overview['avg_progress']}%', Icons.trending_up_rounded, Colors.green),
-        _buildStatCard('Completed', overview['completed_courses'].toString(), Icons.emoji_events_rounded, Colors.purple),
+        _buildStatCard(
+          'Enrollments',
+          overview['total_enrollments'].toString(),
+          Icons.menu_book_rounded,
+          Colors.blue,
+        ),
+        _buildStatCard(
+          'Active',
+          overview['active_courses'].toString(),
+          Icons.play_circle_fill_rounded,
+          Colors.orange,
+        ),
+        _buildStatCard(
+          'Avg Progress',
+          '${overview['avg_progress']}%',
+          Icons.trending_up_rounded,
+          Colors.green,
+        ),
+        _buildStatCard(
+          'Completed',
+          overview['completed_courses'].toString(),
+          Icons.emoji_events_rounded,
+          Colors.purple,
+        ),
       ],
     );
   }
 
-  Widget _buildStatCard(String title, String value, IconData icon, Color color) {
+  Widget _buildStatCard(
+    String title,
+    String value,
+    IconData icon,
+    Color color,
+  ) {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -160,12 +195,12 @@ class _HomeScreenState extends State<HomeScreen> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Container(
-              padding: const EdgeInsets.all(8),
+              padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 color: color.withOpacity(0.12),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(14),
               ),
-              child: Icon(icon, color: color, size: 24),
+              child: Icon(icon, color: color, size: 32),
             ),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -173,17 +208,18 @@ class _HomeScreenState extends State<HomeScreen> {
                 Text(
                   value,
                   style: const TextStyle(
-                    fontSize: 24,
+                    fontSize: 28,
                     fontWeight: FontWeight.bold,
                     color: Colors.black87,
                   ),
                 ),
+                const SizedBox(height: 4),
                 Text(
                   title,
                   style: TextStyle(
-                    fontSize: 13,
-                    color: Colors.grey[600],
-                    fontWeight: FontWeight.w500,
+                    fontSize: 15,
+                    color: Colors.grey[700],
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ],
@@ -198,10 +234,15 @@ class _HomeScreenState extends State<HomeScreen> {
     if (courses.isEmpty) {
       return const Padding(
         padding: EdgeInsets.symmetric(vertical: 20),
-        child: Center(child: Text('No active courses.', style: TextStyle(color: Colors.grey))),
+        child: Center(
+          child: Text(
+            'No active courses.',
+            style: TextStyle(color: Colors.grey),
+          ),
+        ),
       );
     }
-    
+
     return SizedBox(
       height: 220,
       child: ListView.builder(
@@ -228,14 +269,31 @@ class _HomeScreenState extends State<HomeScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 ClipRRect(
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(20),
+                  ),
                   child: Container(
                     height: 120,
                     width: double.infinity,
                     color: Colors.grey[200],
-                    child: course['image'] != null
-                        ? Image.network(course['image'], fit: BoxFit.cover)
-                        : const Icon(Icons.image_outlined, size: 40, color: Colors.grey),
+                    child:
+                        (course['image'] != null &&
+                            course['image'].toString().isNotEmpty)
+                        ? Image.network(
+                            _getImageUrl(course['image']),
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) =>
+                                const Icon(
+                                  Icons.image_outlined,
+                                  size: 40,
+                                  color: Colors.grey,
+                                ),
+                          )
+                        : const Icon(
+                            Icons.image_outlined,
+                            size: 40,
+                            color: Colors.grey,
+                          ),
                   ),
                 ),
                 Padding(
@@ -262,7 +320,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                 value: (course['progress'] ?? 0) / 100,
                                 minHeight: 6,
                                 backgroundColor: Colors.grey[200],
-                                valueColor: const AlwaysStoppedAnimation<Color>(Colors.deepPurple),
+                                valueColor: const AlwaysStoppedAnimation<Color>(
+                                  Colors.deepPurple,
+                                ),
                               ),
                             ),
                           ),
@@ -292,7 +352,12 @@ class _HomeScreenState extends State<HomeScreen> {
     if (activities.isEmpty) {
       return const Padding(
         padding: EdgeInsets.symmetric(vertical: 20),
-        child: Center(child: Text('No recent activity.', style: TextStyle(color: Colors.grey))),
+        child: Center(
+          child: Text(
+            'No recent activity.',
+            style: TextStyle(color: Colors.grey),
+          ),
+        ),
       );
     }
 
@@ -313,18 +378,26 @@ class _HomeScreenState extends State<HomeScreen> {
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
         itemCount: activities.length,
-        separatorBuilder: (context, index) => const Divider(height: 1, indent: 64, color: Color(0xFFEEEEEE)),
+        separatorBuilder: (context, index) =>
+            const Divider(height: 1, indent: 64, color: Color(0xFFEEEEEE)),
         itemBuilder: (context, index) {
           final activity = activities[index];
           return ListTile(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 20,
+              vertical: 8,
+            ),
             leading: Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
                 color: Colors.blue.withOpacity(0.1),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.history_rounded, color: Colors.blue, size: 20),
+              child: const Icon(
+                Icons.history_rounded,
+                color: Colors.blue,
+                size: 20,
+              ),
             ),
             title: Text(
               activity['activity_title'] ?? 'Activity',
@@ -348,7 +421,12 @@ class _HomeScreenState extends State<HomeScreen> {
     if (announcements.isEmpty) {
       return const Padding(
         padding: EdgeInsets.symmetric(vertical: 20),
-        child: Center(child: Text('No announcements.', style: TextStyle(color: Colors.grey))),
+        child: Center(
+          child: Text(
+            'No announcements.',
+            style: TextStyle(color: Colors.grey),
+          ),
+        ),
       );
     }
 
@@ -362,14 +440,21 @@ class _HomeScreenState extends State<HomeScreen> {
             borderRadius: BorderRadius.circular(16),
           ),
           child: ListTile(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 20,
+              vertical: 12,
+            ),
             leading: Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
                 color: Colors.orange.withOpacity(0.15),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.campaign_rounded, color: Colors.orange, size: 20),
+              child: const Icon(
+                Icons.campaign_rounded,
+                color: Colors.orange,
+                size: 20,
+              ),
             ),
             title: Text(
               announcement['title'] ?? 'Announcement',
@@ -395,39 +480,39 @@ class _HomeScreenState extends State<HomeScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _stats == null
-              ? const Center(child: Text('Failed to load dashboard.'))
-              : RefreshIndicator(
-                  onRefresh: _loadData,
-                  child: CustomScrollView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    slivers: [
-                      _buildSliverAppBar(),
-                      SliverPadding(
-                        padding: const EdgeInsets.all(24.0),
-                        sliver: SliverList(
-                          delegate: SliverChildListDelegate([
-                            _buildSectionHeader('Overview'),
-                            const SizedBox(height: 16),
-                            _buildOverviewGrid(_stats!['overview']),
-                            const SizedBox(height: 32),
-                            _buildSectionHeader('Continue Learning'),
-                            const SizedBox(height: 16),
-                            _buildActiveCourses(_stats!['active_courses'] ?? []),
-                            const SizedBox(height: 32),
-                            _buildSectionHeader('Recent Activity'),
-                            const SizedBox(height: 16),
-                            _buildRecentActivity(_stats!['recent_activity'] ?? []),
-                            const SizedBox(height: 32),
-                            _buildSectionHeader('Announcements'),
-                            const SizedBox(height: 16),
-                            _buildAnnouncements(_stats!['announcements'] ?? []),
-                            const SizedBox(height: 40),
-                          ]),
-                        ),
-                      ),
-                    ],
+          ? const Center(child: Text('Failed to load dashboard.'))
+          : RefreshIndicator(
+              onRefresh: _loadData,
+              child: CustomScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                slivers: [
+                  _buildSliverAppBar(),
+                  SliverPadding(
+                    padding: const EdgeInsets.all(24.0),
+                    sliver: SliverList(
+                      delegate: SliverChildListDelegate([
+                        _buildSectionHeader('Overview'),
+                        const SizedBox(height: 16),
+                        _buildOverviewGrid(_stats!['overview']),
+                        const SizedBox(height: 32),
+                        _buildSectionHeader('Continue Learning'),
+                        const SizedBox(height: 16),
+                        _buildActiveCourses(_stats!['active_courses'] ?? []),
+                        const SizedBox(height: 32),
+                        _buildSectionHeader('Recent Activity'),
+                        const SizedBox(height: 16),
+                        _buildRecentActivity(_stats!['recent_activity'] ?? []),
+                        const SizedBox(height: 32),
+                        _buildSectionHeader('Announcements'),
+                        const SizedBox(height: 16),
+                        _buildAnnouncements(_stats!['announcements'] ?? []),
+                        const SizedBox(height: 40),
+                      ]),
+                    ),
                   ),
-                ),
+                ],
+              ),
+            ),
     );
   }
 }
