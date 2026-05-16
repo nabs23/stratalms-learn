@@ -34,14 +34,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> _handleLogout() async {
-    await _apiService.logout();
-    if (!mounted) return;
-    
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (context) => const LoginScreen()),
-    );
-  }
+
 
   Widget _buildSectionHeader(String title) {
     return Text(
@@ -126,14 +119,7 @@ class _HomeScreenState extends State<HomeScreen> {
           );
         },
       ),
-      actions: [
-        IconButton(
-          icon: const Icon(Icons.logout, color: Colors.white),
-          tooltip: 'Logout',
-          onPressed: _handleLogout,
-        ),
-        const SizedBox(width: 8),
-      ],
+
     );
   }
 
