@@ -15,6 +15,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'StrataLMS Learn',
+      debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
@@ -54,7 +55,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
   Future<void> _checkAuthStatus() async {
     final token = await _apiService.getToken();
-    
+
     if (mounted) {
       setState(() {
         _isAuthenticated = token != null;
@@ -66,11 +67,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Scaffold(
-        body: Center(
-          child: CircularProgressIndicator(),
-        ),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     return _isAuthenticated ? const MainScreen() : const LoginScreen();
