@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'services/api_service.dart';
 import 'screens/login_screen.dart';
 import 'screens/main_screen.dart';
@@ -17,6 +18,7 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
+        textTheme: GoogleFonts.notoSansTextTheme(),
         navigationBarTheme: const NavigationBarThemeData(
           height: 72,
           labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
