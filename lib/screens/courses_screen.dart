@@ -183,11 +183,14 @@ class _CoursesScreenState extends State<CoursesScreen> {
                     ? Image.network(
                         _getImageUrl(course['image'].toString()),
                         fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => const Icon(
-                          Icons.image_outlined,
-                          size: 36,
-                          color: Colors.grey,
-                        ),
+                        errorBuilder: (_, error, stackTrace) {
+                          debugPrint('Course image load error (${_getImageUrl(course["image"].toString())}): $error');
+                          return const Icon(
+                            Icons.image_outlined,
+                            size: 36,
+                            color: Colors.grey,
+                          );
+                        },
                       )
                     : const Icon(
                         Icons.image_outlined,

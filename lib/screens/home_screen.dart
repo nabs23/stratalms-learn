@@ -350,12 +350,14 @@ class _HomeScreenState extends State<HomeScreen> {
                         ? Image.network(
                             _getImageUrl(course['image']),
                             fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) =>
-                                const Icon(
-                                  Icons.image_outlined,
-                                  size: 40,
-                                  color: Colors.grey,
-                                ),
+                            errorBuilder: (context, error, stackTrace) {
+                              debugPrint('Home image load error (${_getImageUrl(course["image"])}): $error');
+                              return const Icon(
+                                Icons.image_outlined,
+                                size: 40,
+                                color: Colors.grey,
+                              );
+                            },
                           )
                         : const Icon(
                             Icons.image_outlined,
