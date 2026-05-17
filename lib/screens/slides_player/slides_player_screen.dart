@@ -137,11 +137,13 @@ class _SlidesPlayerScreenState extends State<SlidesPlayerScreen>
       ..reset()
       ..forward();
 
-    unawaited(_pageController.animateToPage(
-      index,
-      duration: const Duration(milliseconds: 350),
-      curve: Curves.easeOutCubic,
-    ));
+    if (_pageController.hasClients) {
+      unawaited(_pageController.animateToPage(
+        index,
+        duration: const Duration(milliseconds: 350),
+        curve: Curves.easeOutCubic,
+      ));
+    }
 
     await _audio.syncForSlide(_currentAudioUrl, autoplay: _audio.isEnabled);
   }

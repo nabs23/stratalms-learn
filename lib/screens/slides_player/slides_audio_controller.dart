@@ -54,19 +54,19 @@ class SlidesAudioController extends ChangeNotifier {
   Future<void> syncForSlide(String? audioUrl, {required bool autoplay}) async {
     final syncId = ++_syncId;
 
-    // Hard-reset without awaiting — prevents old stream events from firing.
-    unawaited(_player.stop());
-    unawaited(_player.seek(Duration.zero));
     _loadedUrl = null;
     _isPlaying = false;
     _position = Duration.zero;
     _duration = Duration.zero;
     notifyListeners();
 
+    try {
+      await _player.stop();
+      await _player.seek(Duration.zero);
+    } catch (_) {}
+
     if (!autoplay || audioUrl == null || audioUrl.isEmpty) return;
 
-    // Yield one microtask so the stop() above can be processed first.
-    await Future<void>.delayed(Duration.zero);
     if (syncId != _syncId) return; // navigated away while waiting
 
     try {
@@ -75,8 +75,10 @@ class SlidesAudioController extends ChangeNotifier {
       _loadedUrl = audioUrl;
       await _player.play();
     } catch (_) {
-      _isPlaying = false;
-      notifyListeners();
+      if (syncId == _syncId) {
+        _isPlaying = false;
+        notifyListeners();
+      }
     }
   }
 
@@ -100,10 +102,17 @@ class SlidesAudioController extends ChangeNotifier {
 
     if (_loadedUrl != audioUrl) {
       // Different URL than what's loaded — hard-reset then load the new one.
-      unawaited(_player.stop());
-      unawaited(_player.seek(Duration.zero));
-      await _player.setUrl(audioUrl);
-      _loadedUrl = audioUrl;
+      try {
+        await _player.stop();
+        await _player.seek(Duration.zero);
+      } catch (_) {}
+      
+      try {
+        await _player.setUrl(audioUrl);
+        _loadedUrl = audioUrl;
+      } catch (_) {
+        return;
+      }
     }
 
     if (_player.playing) {
