@@ -17,14 +17,17 @@ class _MindNode {
 
   /// Centre position on the canvas, assigned during layout.
   Offset center = Offset.zero;
+
+  /// 1-based order among the root's direct children (null for all other nodes).
+  int? ordinal;
 }
 
 // ─── Layout constants ─────────────────────────────────────────────────────────
 
-const double _kNodeW = 185.0; // fixed node width used for positioning
-const double _kNodeH = 52.0; // spacing unit (approximate rendered height)
-const double _kHGap = 56.0; // horizontal gap between node edges
-const double _kVGap = 18.0; // vertical gap between siblings
+const double _kNodeW = 172.0; // fixed node width used for positioning
+const double _kNodeH = 48.0; // spacing unit (approximate rendered height)
+const double _kHGap = 48.0; // horizontal gap between node edges
+const double _kVGap = 14.0; // vertical gap between siblings
 const double _kCanvasW = 4800.0;
 const double _kCanvasH = 4800.0;
 
@@ -108,10 +111,18 @@ class _MindmapViewerScreenState extends State<MindmapViewerScreen> {
     _root.center = const Offset(_kCanvasW / 2, _kCanvasH / 2);
     if (_root.collapsed || _root.children.isEmpty) return;
 
-    // First ceil(n/2) children → left; the rest → right (markmap style).
+    // Assign 1-based ordinals to all direct children in their original order.
+    for (var i = 0; i < _root.children.length; i++) {
+      _root.children[i].ordinal = i + 1;
+    }
+
+    // First ceil(n/2) → right, top-to-bottom.
+    // Remaining → left, reversed so they read bottom-to-top from the root.
     final mid = (_root.children.length / 2).ceil();
-    _placeChildren(_root, _root.children.sublist(0, mid), side: -1);
-    _placeChildren(_root, _root.children.sublist(mid), side: 1);
+    final rightChildren = _root.children.sublist(0, mid);
+    final leftChildren = _root.children.sublist(mid).reversed.toList();
+    _placeChildren(_root, rightChildren, side: 1);
+    _placeChildren(_root, leftChildren, side: -1);
   }
 
   void _placeChildren(_MindNode parent, List<_MindNode> children, {required int side}) {
@@ -253,6 +264,7 @@ class _MindmapViewerScreenState extends State<MindmapViewerScreen> {
                   width: _kNodeW,
                   child: _NodeWidget(
                     node: node,
+                    side: node.side,
                     onTap: node.children.isEmpty
                         ? null
                         : () => setState(() => node.collapsed = !node.collapsed),
@@ -269,87 +281,115 @@ class _MindmapViewerScreenState extends State<MindmapViewerScreen> {
 // ─── Node widget ──────────────────────────────────────────────────────────────
 
 class _NodeWidget extends StatelessWidget {
-  const _NodeWidget({required this.node, this.onTap});
+  const _NodeWidget({required this.node, required this.side, this.onTap});
 
   final _MindNode node;
+  /// -1 = left branch, 1 = right branch, 1 = root (treated as right).
+  final int side;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final color = _colorFor(node.depth);
     final isRoot = node.depth == 0;
+    final isFirstLevel = node.depth == 1;
+    final isLeft = side < 0;
+    final hPad = isRoot ? 14.0 : 10.0;
+    final vPad = isRoot ? 9.0 : 6.0;
+
+    // Ordinal badge — pill shown on the inner (root-facing) edge of depth-1 nodes.
+    final ordinalBadge = node.ordinal != null
+        ? Padding(
+            padding: EdgeInsets.only(
+              left: isLeft ? 4 : 0,
+              right: isLeft ? 0 : 4,
+            ),
+            child: Container(
+              width: 20,
+              height: 20,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: isRoot ? Colors.white.withValues(alpha: 0.2) : color,
+                shape: BoxShape.circle,
+              ),
+              child: Text(
+                '${node.ordinal}',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                  color: isRoot ? Colors.white : Colors.white,
+                  height: 1,
+                ),
+              ),
+            ),
+          )
+        : null;
+
+    final textWidget = Expanded(
+      child: MarkdownBody(
+        data: node.name,
+        shrinkWrap: true,
+        styleSheet: MarkdownStyleSheet(
+          p: TextStyle(
+            fontSize: isRoot ? 13 : 11.5,
+            fontWeight: isRoot ? FontWeight.w700 : FontWeight.w500,
+            color: isRoot ? Colors.white : color,
+            height: 1.3,
+          ),
+          strong: TextStyle(
+            fontWeight: FontWeight.w800,
+            color: isRoot ? Colors.white : color,
+          ),
+          em: TextStyle(
+            fontStyle: FontStyle.italic,
+            color: isRoot ? Colors.white70 : color.withValues(alpha: 0.85),
+          ),
+          code: TextStyle(
+            fontSize: 10.5,
+            fontFamily: 'monospace',
+            color: isRoot ? Colors.white : color,
+            backgroundColor: color.withValues(alpha: isRoot ? 0.25 : 0.12),
+          ),
+          // Remove default paragraph margin
+          blockSpacing: 0,
+          pPadding: EdgeInsets.zero,
+        ),
+      ),
+    );
 
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: EdgeInsets.symmetric(
-          horizontal: isRoot ? 16 : 12,
-          vertical: isRoot ? 10 : 7,
-        ),
+        width: _kNodeW,
+        constraints: isFirstLevel
+            ? const BoxConstraints(minWidth: _kNodeW, minHeight: 60.0)
+            : null,
+        alignment: isFirstLevel ? Alignment.center : null,
+        padding: EdgeInsets.symmetric(horizontal: hPad, vertical: vPad),
         decoration: BoxDecoration(
           color: isRoot ? color : color.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(isRoot ? 14 : 22),
+          borderRadius: BorderRadius.circular(isRoot ? 12 : 20),
           border: isRoot
               ? null
               : Border.all(color: color.withValues(alpha: 0.5), width: 1.5),
           boxShadow: isRoot
               ? [
                   BoxShadow(
-                    color: color.withValues(alpha: 0.35),
-                    blurRadius: 12,
-                    offset: const Offset(0, 3),
+                    color: color.withValues(alpha: 0.32),
+                    blurRadius: 10,
+                    offset: const Offset(0, 2),
                   ),
                 ]
               : null,
         ),
         child: Row(
-          mainAxisSize: MainAxisSize.min,
+          mainAxisSize: MainAxisSize.max,
           crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Flexible(
-              child: MarkdownBody(
-                data: node.name,
-                shrinkWrap: true,
-                styleSheet: MarkdownStyleSheet(
-                  p: TextStyle(
-                    fontSize: isRoot ? 14 : 12,
-                    fontWeight: isRoot ? FontWeight.w700 : FontWeight.w500,
-                    color: isRoot ? Colors.white : color,
-                    height: 1.35,
-                  ),
-                  strong: TextStyle(
-                    fontWeight: FontWeight.w800,
-                    color: isRoot ? Colors.white : color,
-                  ),
-                  em: TextStyle(
-                    fontStyle: FontStyle.italic,
-                    color: isRoot
-                        ? Colors.white70
-                        : color.withValues(alpha: 0.85),
-                  ),
-                  code: TextStyle(
-                    fontSize: 11,
-                    fontFamily: 'monospace',
-                    color: isRoot ? Colors.white : color,
-                    backgroundColor:
-                        color.withValues(alpha: isRoot ? 0.25 : 0.12),
-                  ),
-                ),
-              ),
-            ),
-            if (node.children.isNotEmpty) ...[
-              const SizedBox(width: 5),
-              Icon(
-                node.collapsed
-                    ? Icons.add_circle_outline_rounded
-                    : Icons.remove_circle_outline_rounded,
-                size: 13,
-                color: isRoot
-                    ? Colors.white70
-                    : color.withValues(alpha: 0.65),
-              ),
-            ],
-          ],
+          // Right-branch: [ordinal?, text]  — ordinal on inner (left) edge
+          // Left-branch:  [text, ordinal?]  — ordinal on inner (right) edge
+          children: isLeft
+              ? [textWidget, ?ordinalBadge]
+              : [?ordinalBadge, textWidget],
         ),
       ),
     );
