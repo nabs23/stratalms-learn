@@ -6,6 +6,20 @@ import 'support_screen.dart';
 import 'profile_screen.dart';
 import '../utils/responsive.dart';
 
+class _NavItem {
+  const _NavItem({
+    required this.label,
+    required this.icon,
+    required this.selectedIcon,
+    required this.screen,
+  });
+
+  final String label;
+  final IconData icon;
+  final IconData selectedIcon;
+  final Widget screen;
+}
+
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
 
@@ -16,101 +30,172 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   int _currentIndex = 0;
 
-  final List<Widget> _screens = [
-    const HomeScreen(),
-    const CoursesScreen(),
-    const MessagesScreen(),
-    const SupportScreen(),
-    const ProfileScreen(),
+  final List<_NavItem> _items = [
+    const _NavItem(
+      label: 'Dashboard',
+      icon: Icons.dashboard_outlined,
+      selectedIcon: Icons.dashboard,
+      screen: HomeScreen(),
+    ),
+    const _NavItem(
+      label: 'Courses',
+      icon: Icons.school_outlined,
+      selectedIcon: Icons.school,
+      screen: CoursesScreen(),
+    ),
+    const _NavItem(
+      label: 'Messages',
+      icon: Icons.chat_bubble_outline,
+      selectedIcon: Icons.chat_bubble,
+      screen: MessagesScreen(),
+    ),
+    const _NavItem(
+      label: 'Support',
+      icon: Icons.support_agent_outlined,
+      selectedIcon: Icons.support_agent,
+      screen: SupportScreen(),
+    ),
+    const _NavItem(
+      label: 'Profile',
+      icon: Icons.person_outline,
+      selectedIcon: Icons.person,
+      screen: ProfileScreen(),
+    ),
   ];
+
+  void _onDestinationSelected(int index) {
+    setState(() {
+      _currentIndex = index;
+    });
+  }
+
+  Widget _buildContent() {
+    return IndexedStack(
+      index: _currentIndex,
+      children: _items.map((item) => item.screen).toList(),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     final isTablet = Responsive.isTablet(context);
+    final isWideTablet = MediaQuery.of(context).size.width >= 900;
 
     if (isTablet) {
       return Scaffold(
-        body: Row(
-          children: [
-            NavigationRail(
-              selectedIndex: _currentIndex,
-              onDestinationSelected: (index) {
-                setState(() {
-                  _currentIndex = index;
-                });
-              },
-              labelType: NavigationRailLabelType.all,
-              destinations: const [
-                NavigationRailDestination(
-                  icon: Icon(Icons.dashboard_outlined),
-                  selectedIcon: Icon(Icons.dashboard),
-                  label: Text('Dashboard'),
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 220),
+                  curve: Curves.easeOutCubic,
+                  width: isWideTablet ? 260 : 92,
+                  decoration: BoxDecoration(
+                    color: colorScheme.surfaceContainerLow,
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(color: colorScheme.outlineVariant),
+                  ),
+                  child: Column(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 18, 16, 8),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 36,
+                              height: 36,
+                              decoration: BoxDecoration(
+                                color: colorScheme.primaryContainer,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Icon(
+                                Icons.school_rounded,
+                                color: colorScheme.onPrimaryContainer,
+                                size: 22,
+                              ),
+                            ),
+                            if (isWideTablet) ...[
+                              const SizedBox(width: 12),
+                              const Expanded(
+                                child: Text(
+                                  'Learn',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      Expanded(
+                        child: NavigationRail(
+                          backgroundColor: Colors.transparent,
+                          selectedIndex: _currentIndex,
+                          onDestinationSelected: _onDestinationSelected,
+                          extended: isWideTablet,
+                          labelType: isWideTablet
+                              ? NavigationRailLabelType.none
+                              : NavigationRailLabelType.selected,
+                          useIndicator: true,
+                          minExtendedWidth: 260,
+                          groupAlignment: -0.8,
+                          destinations: _items
+                              .map(
+                                (item) => NavigationRailDestination(
+                                  icon: Icon(item.icon),
+                                  selectedIcon: Icon(item.selectedIcon),
+                                  label: Text(item.label),
+                                ),
+                              )
+                              .toList(),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                NavigationRailDestination(
-                  icon: Icon(Icons.school_outlined),
-                  selectedIcon: Icon(Icons.school),
-                  label: Text('Courses'),
-                ),
-                NavigationRailDestination(
-                  icon: Icon(Icons.chat_bubble_outline),
-                  selectedIcon: Icon(Icons.chat_bubble),
-                  label: Text('Messages'),
-                ),
-                NavigationRailDestination(
-                  icon: Icon(Icons.support_agent_outlined),
-                  selectedIcon: Icon(Icons.support_agent),
-                  label: Text('Support'),
-                ),
-                NavigationRailDestination(
-                  icon: Icon(Icons.person_outline),
-                  selectedIcon: Icon(Icons.person),
-                  label: Text('Profile'),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(24),
+                    child: ColoredBox(
+                      color: colorScheme.surface,
+                      child: _buildContent(),
+                    ),
+                  ),
                 ),
               ],
             ),
-            const VerticalDivider(thickness: 1, width: 1),
-            Expanded(child: _screens[_currentIndex]),
-          ],
+          ),
         ),
       );
     }
 
     return Scaffold(
-      body: _screens[_currentIndex],
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _currentIndex,
-        onDestinationSelected: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
-        },
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.dashboard_outlined),
-            selectedIcon: Icon(Icons.dashboard),
-            label: 'Dashboard',
+      body: _buildContent(),
+      bottomNavigationBar: SafeArea(
+        minimum: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(24),
+          child: NavigationBar(
+            selectedIndex: _currentIndex,
+            onDestinationSelected: _onDestinationSelected,
+            destinations: _items
+                .map(
+                  (item) => NavigationDestination(
+                    icon: Icon(item.icon),
+                    selectedIcon: Icon(item.selectedIcon),
+                    label: item.label,
+                  ),
+                )
+                .toList(),
           ),
-          NavigationDestination(
-            icon: Icon(Icons.school_outlined),
-            selectedIcon: Icon(Icons.school),
-            label: 'Courses',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.chat_bubble_outline),
-            selectedIcon: Icon(Icons.chat_bubble),
-            label: 'Messages',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.support_agent_outlined),
-            selectedIcon: Icon(Icons.support_agent),
-            label: 'Support',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.person_outline),
-            selectedIcon: Icon(Icons.person),
-            label: 'Profile',
-          ),
-        ],
+        ),
       ),
     );
   }

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'services/api_service.dart';
 import 'screens/login_screen.dart';
-import 'screens/home_screen.dart';
+import 'screens/main_screen.dart';
 
 void main() {
   runApp(const MyApp());
@@ -17,6 +17,15 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
+        navigationBarTheme: const NavigationBarThemeData(
+          height: 72,
+          labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+        ),
+        navigationRailTheme: const NavigationRailThemeData(
+          useIndicator: true,
+          minWidth: 76,
+          groupAlignment: -0.8,
+        ),
       ),
       home: const AuthWrapper(),
     );
@@ -62,6 +71,6 @@ class _AuthWrapperState extends State<AuthWrapper> {
       );
     }
 
-    return _isAuthenticated ? const HomeScreen() : const LoginScreen();
+    return _isAuthenticated ? const MainScreen() : const LoginScreen();
   }
 }

@@ -133,40 +133,75 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildOverviewGrid(Map<String, dynamic> overview) {
-    int columns = Responsive.isTablet(context) ? 4 : 2;
-    return GridView.count(
-      crossAxisCount: columns,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      crossAxisSpacing: 16,
-      mainAxisSpacing: 16,
-      childAspectRatio: 1.4,
-      children: [
-        _buildStatCard(
-          'Enrollments',
-          overview['total_enrollments'].toString(),
-          Icons.menu_book_rounded,
-          Colors.blue,
+    final stats = [
+      (
+        title: 'Enrollments',
+        value: overview['total_enrollments'].toString(),
+        icon: Icons.menu_book_rounded,
+        gradient: const LinearGradient(
+          colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
-        _buildStatCard(
-          'Active',
-          overview['active_courses'].toString(),
-          Icons.play_circle_fill_rounded,
-          Colors.orange,
+      ),
+      (
+        title: 'Active Courses',
+        value: overview['active_courses'].toString(),
+        icon: Icons.play_circle_fill_rounded,
+        gradient: const LinearGradient(
+          colors: [Color(0xFF0EA5E9), Color(0xFF06B6D4)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
-        _buildStatCard(
-          'Avg Progress',
-          '${overview['avg_progress']}%',
-          Icons.trending_up_rounded,
-          Colors.green,
+      ),
+      (
+        title: 'Avg Progress',
+        value: '${overview['avg_progress']}%',
+        icon: Icons.trending_up_rounded,
+        gradient: const LinearGradient(
+          colors: [Color(0xFF10B981), Color(0xFF34D399)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
-        _buildStatCard(
-          'Completed',
-          overview['completed_courses'].toString(),
-          Icons.emoji_events_rounded,
-          Colors.purple,
+      ),
+      (
+        title: 'Completed',
+        value: overview['completed_courses'].toString(),
+        icon: Icons.emoji_events_rounded,
+        gradient: const LinearGradient(
+          colors: [Color(0xFFF59E0B), Color(0xFFF97316)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
-      ],
+      ),
+    ];
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth;
+        final columns = width >= 900 ? 4 : 2;
+
+        return GridView.builder(
+          itemCount: stats.length,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: columns,
+            crossAxisSpacing: 14,
+            mainAxisSpacing: 14,
+            childAspectRatio: 1.1,
+          ),
+          itemBuilder: (context, index) {
+            final stat = stats[index];
+            return _buildStatCard(
+              stat.title,
+              stat.value,
+              stat.icon,
+              stat.gradient,
+            );
+          },
+        );
+      },
     );
   }
 
@@ -174,58 +209,91 @@ class _HomeScreenState extends State<HomeScreen> {
     String title,
     String value,
     IconData icon,
-    Color color,
+    LinearGradient gradient,
   ) {
+    final baseColor = gradient.colors.first;
+
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
+        gradient: gradient,
+        borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: color.withOpacity(0.08),
-            blurRadius: 15,
+            color: baseColor.withOpacity(0.35),
+            blurRadius: 20,
             offset: const Offset(0, 8),
           ),
         ],
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
+      child: Stack(
+        children: [
+          // Decorative circle in background
+          Positioned(
+            right: -18,
+            top: -18,
+            child: Container(
+              width: 90,
+              height: 90,
               decoration: BoxDecoration(
-                color: color.withOpacity(0.12),
-                borderRadius: BorderRadius.circular(14),
+                color: Colors.white.withOpacity(0.12),
+                shape: BoxShape.circle,
               ),
-              child: Icon(icon, color: color, size: 32),
             ),
-            Column(
+          ),
+          Positioned(
+            right: 16,
+            bottom: -24,
+            child: Container(
+              width: 70,
+              height: 70,
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.08),
+                shape: BoxShape.circle,
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  value,
-                  style: const TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black87,
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.25),
+                    borderRadius: BorderRadius.circular(14),
                   ),
+                  child: Icon(icon, color: Colors.white, size: 26),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 15,
-                    color: Colors.grey[700],
-                    fontWeight: FontWeight.w600,
-                  ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      value,
+                      style: const TextStyle(
+                        fontSize: 32,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                        height: 1.1,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.white.withOpacity(0.85),
+                        fontWeight: FontWeight.w500,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
