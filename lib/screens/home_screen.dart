@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../repositories/course_repository.dart';
+import '../services/connectivity_service.dart';
 import '../utils/responsive.dart';
 import '../constants/app_constants.dart';
 
@@ -12,10 +13,12 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final _courseRepo = CourseRepository();
+  final _connectivityService = ConnectivityService();
   Map<String, dynamic>? _user;
   Map<String, dynamic>? _stats;
   Set<String> _downloadedCourseIds = {};
   bool _isLoading = true;
+  bool _isOffline = false;
 
   @override
   void initState() {
@@ -24,6 +27,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _loadData() async {
+    final isOnline = await _connectivityService.isOnline();
     final user = await _courseRepo.getUser();
     final stats = await _courseRepo.getDashboardStats();
 
@@ -38,6 +42,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     if (mounted) {
       setState(() {
+        _isOffline = !isOnline;
         _user = user;
         _stats = stats;
         _downloadedCourseIds = downloadedIds;
@@ -585,13 +590,78 @@ class _HomeScreenState extends State<HomeScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _stats == null
-          ? const Center(child: Text('Failed to load dashboard.'))
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.wifi_off_rounded, size: 48, color: Colors.grey),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'You are offline',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'No downloaded courses found.',
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                ],
+              ),
+            )
           : RefreshIndicator(
               onRefresh: _loadData,
               child: CustomScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 slivers: [
                   _buildSliverAppBar(),
+                  if (_isOffline)
+                    SliverToBoxAdapter(
+                      child: Container(
+                        margin: const EdgeInsets.fromLTRB(24, 16, 24, 0),
+                        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.shade50,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.orange.shade200),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: Colors.orange.shade100,
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(Icons.wifi_off_rounded, size: 20, color: Colors.orange.shade800),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'You\'re Offline',
+                                    style: TextStyle(
+                                      color: Colors.orange.shade900,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    'Viewing cached data. Some features may be unavailable.',
+                                    style: TextStyle(
+                                      color: Colors.orange.shade800,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                   SliverPadding(
                     padding: const EdgeInsets.all(24.0),
                     sliver: SliverList(

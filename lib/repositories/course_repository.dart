@@ -1,8 +1,5 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
-import 'dart:io';
-import 'package:http/http.dart' as http;
-import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
 import '../services/api_service.dart';
 import '../services/database_helper.dart';
@@ -58,6 +55,15 @@ class CourseRepository {
           'data': jsonEncode(stats),
           'updated_at': DateTime.now().millisecondsSinceEpoch,
         }, conflictAlgorithm: ConflictAlgorithm.replace);
+
+        // Auto-download active courses in the background
+        final activeCourses = stats?['active_courses'] as List<dynamic>? ?? [];
+        for (var c in activeCourses) {
+          final id = c['course_id']?.toString();
+          if (id != null) {
+            _autoDownloadCourse(id);
+          }
+        }
       } catch (e) {
         debugPrint('Cache stats error: $e');
       }
@@ -70,11 +76,83 @@ class CourseRepository {
           final dataString = result.first['data'] as String;
           return jsonDecode(dataString) as Map<String, dynamic>;
         }
+
+        // Fallback: build stats from cached overview (all courses)
+        final coursesResult = await db.query('courses', where: 'id = ?', whereArgs: ['overview']);
+        if (coursesResult.isNotEmpty) {
+          final courses = jsonDecode(coursesResult.first['data'] as String) as List<dynamic>;
+          if (courses.isNotEmpty) {
+            return _buildStatsFromCourses(courses);
+          }
+        }
+
+        // Ultimate fallback: check downloaded course trees
+        final treesResult = await db.query('course_trees');
+        if (treesResult.isNotEmpty) {
+          final List<dynamic> extractedCourses = [];
+          for (var row in treesResult) {
+            try {
+              final treeData = jsonDecode(row['data'] as String);
+              final course = treeData['course'];
+              if (course != null) {
+                extractedCourses.add({
+                  'course_id': course['id'] ?? row['course_id'],
+                  'title': course['title'] ?? 'Downloaded Course',
+                  'description': course['description'],
+                  'image': course['image_path'] ?? course['thumbnail_path'],
+                  'progress': treeData['progress'] ?? 0,
+                  'is_completed': false,
+                });
+              }
+            } catch (e) {}
+          }
+          if (extractedCourses.isNotEmpty) {
+            return _buildStatsFromCourses(extractedCourses);
+          }
+        }
       } catch (e) {
         debugPrint('Read cached stats error: $e');
       }
       return null;
     }
+  }
+
+  Map<String, dynamic> _buildStatsFromCourses(List<dynamic> courses) {
+    int activeCount = 0;
+    int completedCount = 0;
+    double totalProgress = 0;
+
+    List<dynamic> activeCourses = [];
+    List<dynamic> completedCourses = [];
+
+    for (var course in courses) {
+      final progress = (course['progress'] ?? 0).toDouble();
+      totalProgress += progress;
+      final isCompleted = course['is_completed'] == true || progress >= 100;
+      
+      if (isCompleted) {
+        completedCount++;
+        completedCourses.add(course);
+      } else {
+        activeCount++;
+        activeCourses.add(course);
+      }
+    }
+
+    double avgProgress = courses.isEmpty ? 0 : totalProgress / courses.length;
+
+    return {
+      'overview': {
+        'total_enrollments': courses.length,
+        'active_courses': activeCount,
+        'completed_courses': completedCount,
+        'avg_progress': avgProgress.round(),
+      },
+      'active_courses': activeCourses,
+      'completed_courses': completedCourses,
+      'recent_activity': [],
+      'announcements': [],
+    };
   }
 
   Future<List<dynamic>> getStudentCourses({bool includeCompleted = true}) async {
@@ -91,6 +169,17 @@ class CourseRepository {
           'data': jsonEncode(courses),
           'updated_at': DateTime.now().millisecondsSinceEpoch,
         }, conflictAlgorithm: ConflictAlgorithm.replace);
+
+        // Auto-download active courses in the background
+        for (var c in courses) {
+          final isCompleted = c['is_completed'] == true || (c['progress'] ?? 0) >= 100;
+          if (!isCompleted) {
+            final id = c['course_id']?.toString();
+            if (id != null) {
+              _autoDownloadCourse(id);
+            }
+          }
+        }
       } catch (e) {
         debugPrint('Cache courses error: $e');
       }
@@ -103,6 +192,29 @@ class CourseRepository {
         if (result.isNotEmpty) {
           final dataString = result.first['data'] as String;
           return jsonDecode(dataString) as List<dynamic>;
+        }
+
+        // Ultimate fallback: return extracted courses from trees
+        final treesResult = await db.query('course_trees');
+        if (treesResult.isNotEmpty) {
+          final List<dynamic> extractedCourses = [];
+          for (var row in treesResult) {
+            try {
+              final treeData = jsonDecode(row['data'] as String);
+              final course = treeData['course'];
+              if (course != null) {
+                extractedCourses.add({
+                  'course_id': course['id'] ?? row['course_id'],
+                  'title': course['title'] ?? 'Downloaded Course',
+                  'description': course['description'],
+                  'image': course['image_path'] ?? course['thumbnail_path'],
+                  'progress': treeData['progress'] ?? 0,
+                  'is_completed': false,
+                });
+              }
+            } catch (e) {}
+          }
+          return extractedCourses;
         }
       } catch (e) {
         debugPrint('Read cached courses error: $e');
@@ -219,6 +331,19 @@ class CourseRepository {
       return result.isNotEmpty;
     } catch (e) {
       return false;
+    }
+  }
+
+  // Helper for silent background downloads
+  Future<void> _autoDownloadCourse(String courseId) async {
+    try {
+      if (await isCourseDownloaded(courseId)) {
+        return; // Already downloaded
+      }
+      // Silently download
+      await downloadCourse(courseId);
+    } catch (e) {
+      debugPrint('Auto download course $courseId failed: $e');
     }
   }
 }
