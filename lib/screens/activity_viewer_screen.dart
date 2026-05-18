@@ -1149,75 +1149,90 @@ class _ActivityViewerScreenState extends State<ActivityViewerScreen>
                           ),
                         ),
                       ),
-                      Container(
-                        padding: const EdgeInsets.fromLTRB(12, 10, 12, 14),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          border: Border(
-                            top: BorderSide(color: Colors.grey.withOpacity(0.2)),
+                      SafeArea(
+                        top: false,
+                        child: Container(
+                          padding: const EdgeInsets.fromLTRB(12, 10, 12, 14),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            border: Border(
+                              top: BorderSide(color: Colors.grey.withOpacity(0.2)),
+                            ),
                           ),
-                        ),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: _status == 'COMPLETED'
-                                  ? Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 10,
-                                        vertical: 8,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: Colors.green.withOpacity(0.1),
-                                        borderRadius: BorderRadius.circular(999),
-                                      ),
-                                      child: const Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Icon(
-                                            Icons.check_circle_rounded,
-                                            size: 16,
-                                            color: Colors.green,
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: _status == 'COMPLETED'
+                                    ? Align(
+                                        alignment: Alignment.centerLeft,
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 10,
+                                            vertical: 8,
                                           ),
-                                          SizedBox(width: 6),
-                                          Text(
-                                            'Completed',
-                                            style: TextStyle(
-                                              fontWeight: FontWeight.w700,
-                                              color: Colors.green,
-                                            ),
+                                          decoration: BoxDecoration(
+                                            color: Colors.green.withOpacity(0.1),
+                                            borderRadius: BorderRadius.circular(999),
                                           ),
-                                        ],
-                                      ),
-                                    )
-                                  : Text(
-                                      activityType == 'ARTICLE' && _minimumSeconds > 0
-                                          ? '${_formatTime(minimumRemaining)} remaining'
-                                          : 'Time spent: ${_formatTime(_timeSpent)}',
-                                      style: TextStyle(
-                                        color: Colors.grey[800],
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                            ),
-                            const SizedBox(width: 10),
-                            if (_canManuallyComplete(activityType))
-                              OutlinedButton(
-                                onPressed: _isCompleting ? null : _markComplete,
-                                child: _isCompleting
-                                    ? const SizedBox(
-                                        width: 14,
-                                        height: 14,
-                                        child: CircularProgressIndicator(strokeWidth: 2),
+                                          child: const Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(
+                                                Icons.check_circle_rounded,
+                                                size: 16,
+                                                color: Colors.green,
+                                              ),
+                                              SizedBox(width: 6),
+                                              Text(
+                                                'Completed',
+                                                style: TextStyle(
+                                                  fontWeight: FontWeight.w700,
+                                                  color: Colors.green,
+                                                  fontSize: 13,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
                                       )
-                                    : const Text('Mark Complete'),
+                                    : Text(
+                                        activityType == 'ARTICLE' && _minimumSeconds > 0
+                                            ? '${_formatTime(minimumRemaining)} left'
+                                            : 'Time: ${_formatTime(_timeSpent)}',
+                                        style: TextStyle(
+                                          color: Colors.grey[800],
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 13,
+                                        ),
+                                      ),
                               ),
-                            const SizedBox(width: 8),
-                            FilledButton.icon(
-                              onPressed: _status == 'COMPLETED' ? _navigateNext : null,
-                              icon: const Icon(Icons.arrow_forward_rounded),
-                              label: const Text('Next'),
-                            ),
-                          ],
+                              const SizedBox(width: 8),
+                              if (_canManuallyComplete(activityType)) ...[
+                                OutlinedButton(
+                                  onPressed: _isCompleting ? null : _markComplete,
+                                  style: OutlinedButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                                  ),
+                                  child: _isCompleting
+                                      ? const SizedBox(
+                                          width: 14,
+                                          height: 14,
+                                          child: CircularProgressIndicator(strokeWidth: 2),
+                                        )
+                                      : const Text('Complete'),
+                                ),
+                                const SizedBox(width: 8),
+                              ],
+                              FilledButton.icon(
+                                onPressed: _status == 'COMPLETED' ? _navigateNext : null,
+                                style: FilledButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                                ),
+                                icon: const Icon(Icons.arrow_forward_rounded, size: 18),
+                                label: const Text('Next'),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ],
