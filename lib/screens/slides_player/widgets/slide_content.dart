@@ -27,7 +27,7 @@ class SlideContent extends StatelessWidget {
   Widget build(BuildContext context) {
     final type = slide['slide_type']?.toString() ?? 'TITLE_CARD';
     final imageUrl = resolveUrl(slide['image_url']?.toString());
-    final hasImage = imageUrl != null && imageUrl.isNotEmpty;
+    final hasImage = imageUrl != null && imageUrl.isNotEmpty && type != 'TITLE_CARD' && type != 'SUMMARY';
 
     if (type == 'TEXT_AND_IMAGE') {
       return Column(

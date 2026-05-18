@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'dart:async';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'services/api_service.dart';
+import 'services/connectivity_service.dart';
+import 'repositories/progress_sync_repository.dart';
 import 'screens/login_screen.dart';
 import 'screens/main_screen.dart';
 
@@ -44,13 +48,31 @@ class AuthWrapper extends StatefulWidget {
 
 class _AuthWrapperState extends State<AuthWrapper> {
   final _apiService = ApiService();
+  final _connectivityService = ConnectivityService();
+  final _progressSyncRepo = ProgressSyncRepository();
   bool _isLoading = true;
   bool _isAuthenticated = false;
+  StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
 
   @override
   void initState() {
     super.initState();
     _checkAuthStatus();
+    _setupConnectivityListener();
+  }
+
+  void _setupConnectivityListener() {
+    _connectivitySubscription = _connectivityService.connectivityStream.listen((results) {
+      if (results.any((r) => r != ConnectivityResult.none)) {
+        _progressSyncRepo.syncPendingProgress();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _connectivitySubscription?.cancel();
+    super.dispose();
   }
 
   Future<void> _checkAuthStatus() async {

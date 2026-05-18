@@ -51,6 +51,8 @@ class _SlidesPlayerScreenState extends State<SlidesPlayerScreen>
   Map<String, dynamic> get _currentSlide => _orderedSlides[_currentIndex];
   bool get _hasAudio => (_currentSlide['audio_url']?.toString() ?? '').isNotEmpty;
   bool get _hasImage {
+    final type = _currentSlide['slide_type']?.toString() ?? 'TITLE_CARD';
+    if (type == 'TITLE_CARD' || type == 'SUMMARY') return false;
     final url = _resolveUrl(_currentSlide['image_url']?.toString());
     return url != null && url.isNotEmpty;
   }

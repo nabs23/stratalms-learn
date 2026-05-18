@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../services/api_service.dart';
+import '../repositories/course_repository.dart';
 import '../constants/app_constants.dart';
 import '../utils/responsive.dart';
 import 'course_detail_screen.dart';
@@ -12,7 +12,7 @@ class CoursesScreen extends StatefulWidget {
 }
 
 class _CoursesScreenState extends State<CoursesScreen> {
-  final _apiService = ApiService();
+  final _courseRepo = CourseRepository();
   final _searchController = TextEditingController();
 
   bool _isLoading = true;
@@ -20,6 +20,7 @@ class _CoursesScreenState extends State<CoursesScreen> {
   Map<String, dynamic>? _overview;
   List<dynamic> _activeCourses = [];
   List<dynamic> _completedCourses = [];
+  Set<String> _downloadedCourseIds = {};
 
   @override
   void initState() {
@@ -34,14 +35,34 @@ class _CoursesScreenState extends State<CoursesScreen> {
   }
 
   Future<void> _loadCourses() async {
-    final data = await _apiService.getStudentCoursesOverview();
+    final data = await _courseRepo.getDashboardStats();
+
+    if (!mounted) return;
+
+    final active = data?['active_courses'] as List<dynamic>? ?? [];
+    final completed = data?['completed_courses'] as List<dynamic>? ?? [];
+
+    final downloadedIds = <String>{};
+    for (final c in active) {
+      final id = c['course_id']?.toString();
+      if (id != null && await _courseRepo.isCourseDownloaded(id)) {
+        downloadedIds.add(id);
+      }
+    }
+    for (final c in completed) {
+      final id = c['course_id']?.toString();
+      if (id != null && await _courseRepo.isCourseDownloaded(id)) {
+        downloadedIds.add(id);
+      }
+    }
 
     if (!mounted) return;
 
     setState(() {
       _overview = data?['overview'] as Map<String, dynamic>?;
-      _activeCourses = data?['active_courses'] as List<dynamic>? ?? [];
-      _completedCourses = data?['completed_courses'] as List<dynamic>? ?? [];
+      _activeCourses = active;
+      _completedCourses = completed;
+      _downloadedCourseIds = downloadedIds;
       _isLoading = false;
     });
   }
@@ -142,6 +163,8 @@ class _CoursesScreenState extends State<CoursesScreen> {
   Widget _buildCourseCard(Map<String, dynamic> course, {required bool isDone}) {
     final progress = (course['progress'] ?? 0).toDouble();
     final grade = course['grade'];
+    final courseId = course['course_id']?.toString();
+    final isDownloaded = courseId != null && _downloadedCourseIds.contains(courseId);
 
     return InkWell(
       borderRadius: BorderRadius.circular(20),
@@ -199,6 +222,27 @@ class _CoursesScreenState extends State<CoursesScreen> {
                       ),
               ),
             ),
+            if (isDownloaded)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                color: Colors.deepPurple,
+                child: const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.offline_pin_rounded, size: 12, color: Colors.white),
+                    SizedBox(width: 4),
+                    Text(
+                      'Available Offline',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             Padding(
               padding: const EdgeInsets.all(16),
               child: Column(

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+import 'package:video_player/video_player.dart';
+import 'package:chewie/chewie.dart';
 
 class VideoViewerScreen extends StatefulWidget {
   const VideoViewerScreen({
@@ -17,7 +19,9 @@ class VideoViewerScreen extends StatefulWidget {
 }
 
 class _VideoViewerScreenState extends State<VideoViewerScreen> {
-  WebViewController? _controller;
+  WebViewController? _webViewController;
+  VideoPlayerController? _videoPlayerController;
+  ChewieController? _chewieController;
   bool _isLoading = true;
 
   String? get _youTubeEmbedUrl {
@@ -31,11 +35,21 @@ class _VideoViewerScreenState extends State<VideoViewerScreen> {
 
   bool get _isYouTube => _youTubeEmbedUrl != null;
 
+  String? get _muxPlaybackId {
+    if (widget.videoUrl.startsWith('mux://')) {
+      final cleanUrl = widget.videoUrl.replaceFirst('mux://', '');
+      return cleanUrl.split('?').first;
+    }
+    return null;
+  }
+
+  bool get _isMux => _muxPlaybackId != null;
+
   @override
   void initState() {
     super.initState();
     if (_isYouTube) {
-      _controller = WebViewController()
+      _webViewController = WebViewController()
         ..setJavaScriptMode(JavaScriptMode.unrestricted)
         ..setNavigationDelegate(
           NavigationDelegate(
@@ -45,13 +59,57 @@ class _VideoViewerScreenState extends State<VideoViewerScreen> {
           ),
         )
         ..loadRequest(Uri.parse(_youTubeEmbedUrl!));
+    } else if (_isMux) {
+      _initVideoPlayer('https://stream.mux.com/$_muxPlaybackId.m3u8');
+    } else if (widget.videoUrl.startsWith('http')) {
+      _initVideoPlayer(widget.videoUrl);
+    } else {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _initVideoPlayer(String url) async {
+    _videoPlayerController = VideoPlayerController.networkUrl(Uri.parse(url));
+    try {
+      await _videoPlayerController!.initialize();
+      if (!mounted) return;
+
+      _chewieController = ChewieController(
+        videoPlayerController: _videoPlayerController!,
+        autoPlay: true,
+        looping: false,
+        errorBuilder: (context, errorMessage) {
+          return Center(
+            child: Text(
+              errorMessage,
+              style: const TextStyle(color: Colors.white),
+            ),
+          );
+        },
+      );
+    } catch (e) {
+      debugPrint('Video Player Initialization Error: $e');
+      // Allow fallback if initialization fails
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
   Future<void> _openExternally() async {
-    final uri = Uri.tryParse(widget.videoUrl);
+    final uri = Uri.tryParse(
+      _isMux ? 'https://stream.mux.com/$_muxPlaybackId.m3u8' : widget.videoUrl,
+    );
     if (uri == null) return;
     await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
+  @override
+  void dispose() {
+    _videoPlayerController?.dispose();
+    _chewieController?.dispose();
+    super.dispose();
   }
 
   @override
@@ -77,8 +135,26 @@ class _VideoViewerScreenState extends State<VideoViewerScreen> {
           ),
         ],
       ),
-      body: _isYouTube ? _buildYouTubePlayer() : _buildExternalFallback(),
+      body: _buildBody(),
     );
+  }
+
+  Widget _buildBody() {
+    if (_isYouTube) {
+      return _buildYouTubePlayer();
+    }
+    
+    if (_chewieController != null) {
+      return _buildChewiePlayer();
+    }
+    
+    if (_isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(color: Colors.white),
+      );
+    }
+
+    return _buildExternalFallback();
   }
 
   Widget _buildYouTubePlayer() {
@@ -87,7 +163,7 @@ class _VideoViewerScreenState extends State<VideoViewerScreen> {
         Center(
           child: AspectRatio(
             aspectRatio: 16 / 9,
-            child: WebViewWidget(controller: _controller!),
+            child: WebViewWidget(controller: _webViewController!),
           ),
         ),
         if (_isLoading)
@@ -98,6 +174,12 @@ class _VideoViewerScreenState extends State<VideoViewerScreen> {
     );
   }
 
+  Widget _buildChewiePlayer() {
+    return Center(
+      child: Chewie(controller: _chewieController!),
+    );
+  }
+
   Widget _buildExternalFallback() {
     return Center(
       child: Padding(
@@ -105,9 +187,9 @@ class _VideoViewerScreenState extends State<VideoViewerScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.play_circle_outline_rounded, size: 64, color: Colors.white70),
+            const Icon(Icons.play_circle_outline_rounded, size: 64, color: Colors.white70),
             const SizedBox(height: 16),
-            Text(
+            const Text(
               'This video is hosted externally.',
               textAlign: TextAlign.center,
               style: TextStyle(color: Colors.white70, fontSize: 15),

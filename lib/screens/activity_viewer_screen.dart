@@ -4,6 +4,9 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/api_service.dart';
+import '../repositories/course_repository.dart';
+import '../repositories/progress_sync_repository.dart';
+import '../services/connectivity_service.dart';
 import 'flashcards_player_screen.dart';
 import 'mindmap_viewer_screen.dart';
 import 'slides_player_screen.dart';
@@ -33,6 +36,9 @@ class ActivityViewerScreen extends StatefulWidget {
 class _ActivityViewerScreenState extends State<ActivityViewerScreen>
     with WidgetsBindingObserver {
   final _apiService = ApiService();
+  final _courseRepo = CourseRepository();
+  final _progressSyncRepo = ProgressSyncRepository();
+  final _connectivityService = ConnectivityService();
 
   bool _isLoading = true;
   bool _hasAppFocus = true;
@@ -87,7 +93,7 @@ class _ActivityViewerScreenState extends State<ActivityViewerScreen>
   }
 
   Future<void> _loadActivity() async {
-    final data = await _apiService.getStudentActivityDetail(
+    final data = await _courseRepo.getStudentActivityDetail(
       courseId: widget.courseId,
       activityId: widget.activityId,
     );
@@ -115,7 +121,7 @@ class _ActivityViewerScreenState extends State<ActivityViewerScreen>
     });
 
     if (_status != 'COMPLETED') {
-      final startResponse = await _apiService.startStudentActivityProgress(
+      final startResponse = await _progressSyncRepo.startStudentActivityProgress(
         courseId: widget.courseId,
         activityId: widget.activityId,
       );
@@ -196,7 +202,7 @@ class _ActivityViewerScreenState extends State<ActivityViewerScreen>
       return;
     }
 
-    final response = await _apiService.updateStudentActivityProgress(
+    final response = await _progressSyncRepo.updateStudentActivityProgress(
       courseId: widget.courseId,
       activityId: widget.activityId,
       timeSpent: _timeSpent,
@@ -223,7 +229,7 @@ class _ActivityViewerScreenState extends State<ActivityViewerScreen>
       _isCompleting = true;
     });
 
-    final response = await _apiService.completeStudentActivityProgress(
+    final response = await _progressSyncRepo.completeStudentActivityProgress(
       courseId: widget.courseId,
       activityId: widget.activityId,
       timeSpent: _timeSpent,
@@ -423,6 +429,14 @@ class _ActivityViewerScreenState extends State<ActivityViewerScreen>
   }
 
   Future<void> _openUrl(String? url) async {
+    final isOnline = await _connectivityService.isOnline();
+    if (!isOnline && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Cannot open external links while offline.')),
+      );
+      return;
+    }
+
     if (url == null || url.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('No URL available for this activity.')),
@@ -563,10 +577,35 @@ class _ActivityViewerScreenState extends State<ActivityViewerScreen>
             _buildTextPanel(
               description?.isNotEmpty == true
                   ? description!
-                  : 'Tap below to open this video using your device browser/player.',
+                  : 'Tap below to play this video natively.',
             ),
             const SizedBox(height: 12),
-            _buildOpenLinkButton(url, 'Play Video'),
+            if (url?.isNotEmpty == true)
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: () async {
+                    if (await _connectivityService.isOnline()) {
+                      if (!mounted) return;
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => VideoViewerScreen(
+                            activityTitle: title,
+                            videoUrl: url!,
+                          ),
+                        ),
+                      );
+                    } else {
+                      if (!mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Video playback is not available offline.')),
+                      );
+                    }
+                  },
+                  icon: const Icon(Icons.play_arrow_rounded),
+                  label: const Text('Play Video'),
+                ),
+              ),
           ],
         );
       case 'FILE':
@@ -871,14 +910,24 @@ class _ActivityViewerScreenState extends State<ActivityViewerScreen>
           ),
         if (videoUrl != null)
           OutlinedButton.icon(
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => VideoViewerScreen(
-                  activityTitle: activityTitle,
-                  videoUrl: videoUrl,
-                ),
-              ),
-            ),
+            onPressed: () async {
+              if (await _connectivityService.isOnline()) {
+                if (!mounted) return;
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => VideoViewerScreen(
+                      activityTitle: activityTitle,
+                      videoUrl: videoUrl,
+                    ),
+                  ),
+                );
+              } else {
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Video playback is not available offline.')),
+                );
+              }
+            },
             icon: const Icon(Icons.play_circle_outline_rounded, size: 16),
             label: const Text('Explainer Video'),
           ),

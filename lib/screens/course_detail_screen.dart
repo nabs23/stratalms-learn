@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'course_content_screen.dart';
+import '../repositories/course_repository.dart';
 
-class CourseDetailScreen extends StatelessWidget {
+class CourseDetailScreen extends StatefulWidget {
   const CourseDetailScreen({
     super.key,
     required this.course,
@@ -12,6 +13,66 @@ class CourseDetailScreen extends StatelessWidget {
   final Map<String, dynamic> course;
   final bool isCompleted;
   final String Function(String?) imageUrlBuilder;
+
+  @override
+  State<CourseDetailScreen> createState() => _CourseDetailScreenState();
+}
+
+class _CourseDetailScreenState extends State<CourseDetailScreen> {
+  final _courseRepo = CourseRepository();
+  bool _isDownloaded = false;
+  bool _isDownloading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkDownloadedStatus();
+  }
+
+  Future<void> _checkDownloadedStatus() async {
+    final courseId = widget.course['course_id']?.toString();
+    if (courseId != null) {
+      final downloaded = await _courseRepo.isCourseDownloaded(courseId);
+      if (mounted) {
+        setState(() {
+          _isDownloaded = downloaded;
+        });
+      }
+    }
+  }
+
+  Future<void> _downloadCourse() async {
+    final courseId = widget.course['course_id']?.toString();
+    if (courseId == null) return;
+
+    setState(() {
+      _isDownloading = true;
+    });
+
+    try {
+      await _courseRepo.downloadCourse(courseId);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Course downloaded successfully')),
+        );
+        setState(() {
+          _isDownloaded = true;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to download course')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isDownloading = false;
+        });
+      }
+    }
+  }
 
   String _readableType(String? type) {
     if (type == null || type.isEmpty) return 'General';
@@ -101,17 +162,17 @@ class CourseDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final title = course['title']?.toString() ?? 'Untitled course';
-    final courseId = course['course_id']?.toString();
-    final image = course['image']?.toString();
-    final progress = (course['progress'] ?? 0).toDouble();
-    final grade = course['grade']?.toString();
-    final instructor = course['instructor_name']?.toString();
-    final lastAccessed = course['last_accessed_at']?.toString();
-    final completedAt = course['completed_at']?.toString();
-    final enrolledAt = course['enrolled_at']?.toString();
-    final type = _readableType(course['type']?.toString());
-    final issuesCertificate = (course['issues_certificate'] ?? false) == true;
+    final title = widget.course['title']?.toString() ?? 'Untitled course';
+    final courseId = widget.course['course_id']?.toString();
+    final image = widget.course['image']?.toString();
+    final progress = (widget.course['progress'] ?? 0).toDouble();
+    final grade = widget.course['grade']?.toString();
+    final instructor = widget.course['instructor_name']?.toString();
+    final lastAccessed = widget.course['last_accessed_at']?.toString();
+    final completedAt = widget.course['completed_at']?.toString();
+    final enrolledAt = widget.course['enrolled_at']?.toString();
+    final type = _readableType(widget.course['type']?.toString());
+    final issuesCertificate = (widget.course['issues_certificate'] ?? false) == true;
 
     return Scaffold(
       backgroundColor: Colors.grey[50],
@@ -121,6 +182,31 @@ class CourseDetailScreen extends StatelessWidget {
             expandedHeight: 240,
             pinned: true,
             backgroundColor: Colors.deepPurple,
+            actions: [
+              if (_isDownloading)
+                const Padding(
+                  padding: EdgeInsets.all(16.0),
+                  child: SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      color: Colors.white,
+                      strokeWidth: 2,
+                    ),
+                  ),
+                )
+              else if (_isDownloaded)
+                const Padding(
+                  padding: EdgeInsets.all(16.0),
+                  child: Icon(Icons.offline_pin_rounded, color: Colors.white),
+                )
+              else
+                IconButton(
+                  icon: const Icon(Icons.download_rounded, color: Colors.white),
+                  onPressed: _downloadCourse,
+                  tooltip: 'Download Course',
+                ),
+            ],
             flexibleSpace: FlexibleSpaceBar(
               titlePadding: const EdgeInsets.only(left: 18, right: 18, bottom: 14),
               title: Text(
@@ -134,7 +220,7 @@ class CourseDetailScreen extends StatelessWidget {
                 children: [
                   (image != null && image.isNotEmpty)
                       ? Image.network(
-                          imageUrlBuilder(image),
+                          widget.imageUrlBuilder(image),
                           fit: BoxFit.cover,
                           errorBuilder: (_, __, ___) => Container(
                             color: Colors.deepPurple,
@@ -180,10 +266,10 @@ class CourseDetailScreen extends StatelessWidget {
                     runSpacing: 8,
                     children: [
                       _buildInfoChip(
-                        isCompleted
+                        widget.isCompleted
                             ? Icons.verified_rounded
                             : Icons.play_circle_fill_rounded,
-                        isCompleted ? 'Completed' : 'Active',
+                        widget.isCompleted ? 'Completed' : 'Active',
                       ),
                       _buildInfoChip(Icons.category_rounded, type),
                       if (issuesCertificate)
@@ -245,7 +331,7 @@ class CourseDetailScreen extends StatelessWidget {
                         ),
                         const SizedBox(height: 10),
                         Text(
-                          isCompleted
+                          widget.isCompleted
                               ? 'You have completed this course.'
                               : 'Keep going, you are making steady progress.',
                           style: TextStyle(
@@ -280,7 +366,7 @@ class CourseDetailScreen extends StatelessWidget {
                               fontWeight: FontWeight.w600,
                             ),
                           ),
-                        if (!isCompleted &&
+                        if (!widget.isCompleted &&
                             lastAccessed != null &&
                             lastAccessed.isNotEmpty) ...[
                           const SizedBox(height: 8),
@@ -293,7 +379,7 @@ class CourseDetailScreen extends StatelessWidget {
                             ),
                           ),
                         ],
-                        if (isCompleted &&
+                        if (widget.isCompleted &&
                             completedAt != null &&
                             completedAt.isNotEmpty) ...[
                           const SizedBox(height: 8),
@@ -326,12 +412,12 @@ class CourseDetailScreen extends StatelessWidget {
                               );
                             },
                       icon: Icon(
-                        isCompleted
+                        widget.isCompleted
                             ? Icons.workspace_premium_rounded
                             : Icons.play_arrow_rounded,
                       ),
                       label: Text(
-                        isCompleted
+                        widget.isCompleted
                             ? 'View Course Content'
                             : 'Continue Learning',
                       ),

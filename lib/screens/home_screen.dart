@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../services/api_service.dart';
+import '../repositories/course_repository.dart';
 import '../utils/responsive.dart';
 import '../constants/app_constants.dart';
 
@@ -11,9 +11,10 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  final _apiService = ApiService();
+  final _courseRepo = CourseRepository();
   Map<String, dynamic>? _user;
   Map<String, dynamic>? _stats;
+  Set<String> _downloadedCourseIds = {};
   bool _isLoading = true;
 
   @override
@@ -23,13 +24,23 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _loadData() async {
-    final user = await _apiService.getUser();
-    final stats = await _apiService.getDashboardStats();
+    final user = await _courseRepo.getUser();
+    final stats = await _courseRepo.getDashboardStats();
+
+    final active = stats?['active_courses'] as List<dynamic>? ?? [];
+    final downloadedIds = <String>{};
+    for (final c in active) {
+      final id = c['course_id']?.toString();
+      if (id != null && await _courseRepo.isCourseDownloaded(id)) {
+        downloadedIds.add(id);
+      }
+    }
 
     if (mounted) {
       setState(() {
         _user = user;
         _stats = stats;
+        _downloadedCourseIds = downloadedIds;
         _isLoading = false;
       });
     }
@@ -319,6 +330,9 @@ class _HomeScreenState extends State<HomeScreen> {
         itemCount: courses.length,
         itemBuilder: (context, index) {
           final course = courses[index];
+          final courseId = course['course_id']?.toString();
+          final isDownloaded = courseId != null && _downloadedCourseIds.contains(courseId);
+
           return Container(
             width: 260,
             margin: const EdgeInsets.only(right: 20),
@@ -366,6 +380,27 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                   ),
                 ),
+                if (isDownloaded)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    color: Colors.deepPurple,
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.offline_pin_rounded, size: 10, color: Colors.white),
+                        SizedBox(width: 4),
+                        Text(
+                          'Available Offline',
+                          style: TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 Padding(
                   padding: const EdgeInsets.all(16.0),
                   child: Column(

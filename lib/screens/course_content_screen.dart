@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'activity_viewer_screen.dart';
-import '../services/api_service.dart';
+import '../repositories/course_repository.dart';
 
 class CourseContentScreen extends StatefulWidget {
   const CourseContentScreen({
@@ -17,7 +17,7 @@ class CourseContentScreen extends StatefulWidget {
 }
 
 class _CourseContentScreenState extends State<CourseContentScreen> {
-  final _apiService = ApiService();
+  final _courseRepo = CourseRepository();
   bool _isLoading = true;
   Map<String, dynamic>? _tree;
 
@@ -136,7 +136,7 @@ class _CourseContentScreenState extends State<CourseContentScreen> {
   }
 
   Future<void> _loadTree() async {
-    final data = await _apiService.getStudentCourseTree(widget.courseId);
+    final data = await _courseRepo.getStudentCourseTree(widget.courseId);
 
     if (!mounted) return;
 
