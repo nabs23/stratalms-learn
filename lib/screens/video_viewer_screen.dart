@@ -122,6 +122,8 @@ class _VideoViewerScreenState extends State<VideoViewerScreen> {
         title: Text(
           widget.activityTitle,
           style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
         ),
         leading: IconButton(
           icon: const Icon(Icons.close),

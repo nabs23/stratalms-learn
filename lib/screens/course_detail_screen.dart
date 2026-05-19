@@ -20,7 +20,7 @@ class CourseDetailScreen extends StatefulWidget {
 
 class _CourseDetailScreenState extends State<CourseDetailScreen> {
   final _courseRepo = CourseRepository();
-  bool _isDownloaded = false;
+  CourseDownloadStatus _downloadStatus = CourseDownloadStatus.notDownloaded;
   bool _isDownloading = false;
 
   @override
@@ -32,10 +32,10 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
   Future<void> _checkDownloadedStatus() async {
     final courseId = widget.course['course_id']?.toString();
     if (courseId != null) {
-      final downloaded = await _courseRepo.isCourseDownloaded(courseId);
+      final status = await _courseRepo.getCourseDownloadStatus(courseId);
       if (mounted) {
         setState(() {
-          _isDownloaded = downloaded;
+          _downloadStatus = status;
         });
       }
     }
@@ -51,12 +51,19 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
 
     try {
       await _courseRepo.downloadCourse(courseId);
+      final status = await _courseRepo.getCourseDownloadStatus(courseId);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Course downloaded successfully')),
+          SnackBar(
+            content: Text(
+              status == CourseDownloadStatus.fullyDownloaded
+                  ? 'Course downloaded successfully'
+                  : 'Course partially downloaded',
+            ),
+          ),
         );
         setState(() {
-          _isDownloaded = true;
+          _downloadStatus = status;
         });
       }
     } catch (e) {
@@ -195,10 +202,16 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
                     ),
                   ),
                 )
-              else if (_isDownloaded)
+              else if (_downloadStatus == CourseDownloadStatus.fullyDownloaded)
                 const Padding(
                   padding: EdgeInsets.all(16.0),
                   child: Icon(Icons.offline_pin_rounded, color: Colors.white),
+                )
+              else if (_downloadStatus == CourseDownloadStatus.partiallyDownloaded)
+                IconButton(
+                  icon: const Icon(Icons.downloading_rounded, color: Colors.white),
+                  onPressed: _downloadCourse,
+                  tooltip: 'Continue Download',
                 )
               else
                 IconButton(

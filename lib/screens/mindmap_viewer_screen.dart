@@ -220,6 +220,8 @@ class _MindmapViewerScreenState extends State<MindmapViewerScreen> {
             Text(
               widget.activityTitle,
               style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
             const Text(
               'Tap a node to expand / collapse',

@@ -5,11 +5,10 @@ import 'package:flutter/services.dart';
 
 import '../../constants/app_constants.dart';
 import '../../utils/responsive.dart';
+import '../tablet/tablet_slides_player_body.dart';
 import 'slides_audio_controller.dart';
 import 'slides_player_constants.dart';
 import 'widgets/slide_content.dart';
-import 'widgets/slide_types/slide_image_card.dart';
-import 'widgets/slide_types/slide_text_and_image.dart';
 import 'widgets/slides_audio_panel.dart';
 import 'widgets/slides_bottom_bar.dart';
 import 'widgets/slides_header.dart';
@@ -187,7 +186,17 @@ class _SlidesPlayerScreenState extends State<SlidesPlayerScreen>
             ),
             Expanded(
               child: Responsive.isTablet(context)
-                  ? _buildTabletLayout()
+                ? TabletSlidesPlayerBody(
+                  currentSlide: _currentSlide,
+                  currentIndex: _currentIndex,
+                  audio: _audio,
+                  hasAudio: _hasAudio,
+                  imageFit: _imageFit,
+                  revealedAnswers: _revealedAnswers,
+                  resolveUrl: _resolveUrl,
+                  onReveal: () =>
+                    setState(() => _revealedAnswers.add(_currentIndex)),
+                )
                   : _buildPhoneLayout(),
             ),
             SlidesBottomBar(
@@ -242,72 +251,6 @@ class _SlidesPlayerScreenState extends State<SlidesPlayerScreen>
                 },
               );
             },
-          ),
-        ),
-        _buildAudioPanel(),
-      ],
-    );
-  }
-
-  Widget _buildTabletLayout() {
-    final slide = _currentSlide;
-    final type = slide['slide_type']?.toString() ?? 'TITLE_CARD';
-    final imageUrl = _resolveUrl(slide['image_url']?.toString());
-    final hasImage = imageUrl != null && imageUrl.isNotEmpty;
-
-    if (type == 'TEXT_AND_IMAGE' && hasImage) {
-      return Column(
-        children: [
-          Expanded(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  flex: 5,
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 20, 10, 8),
-                    child: SlideImageCard(
-                      imageUrl: imageUrl,
-                      imageFit: _imageFit,
-                    ),
-                  ),
-                ),
-                Expanded(
-                  flex: 5,
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(10, 20, 20, 8),
-                    child: SlideTextAndImage(
-                      slide: slide,
-                      resolveUrl: _resolveUrl,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          _buildAudioPanel(),
-        ],
-      );
-    }
-
-    return Column(
-      children: [
-        Expanded(
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 800),
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
-                child: SlideContent(
-                  slide: slide,
-                  resolveUrl: _resolveUrl,
-                  imageFit: _imageFit,
-                  isRevealed: _revealedAnswers.contains(_currentIndex),
-                  onReveal: () =>
-                      setState(() => _revealedAnswers.add(_currentIndex)),
-                ),
-              ),
-            ),
           ),
         ),
         _buildAudioPanel(),

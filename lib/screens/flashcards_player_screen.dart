@@ -221,26 +221,65 @@ class _FlashcardsPlayerScreenState extends State<FlashcardsPlayerScreen>
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
-        child: Row(
-          children: [
-            OutlinedButton.icon(
-              onPressed: _isFirst || _isAnimating ? null : _goPrevious,
-              icon: const Icon(Icons.chevron_left_rounded),
-              label: const Text('Previous'),
-            ),
-            const Spacer(),
-            OutlinedButton.icon(
-              onPressed: _isAnimating ? null : _flip,
-              icon: const Icon(Icons.flip_rounded),
-              label: Text(_isFlipped ? 'Show Question' : 'Reveal Answer'),
-            ),
-            const Spacer(),
-            OutlinedButton.icon(
-              onPressed: _isLast || _isAnimating ? null : _goNext,
-              label: const Text('Next'),
-              icon: const Icon(Icons.chevron_right_rounded),
-            ),
-          ],
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isCompact = constraints.maxWidth < 360;
+
+            if (isCompact) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: _isAnimating ? null : _flip,
+                    icon: const Icon(Icons.flip_rounded),
+                    label: Text(_isFlipped ? 'Show Question' : 'Reveal Answer'),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: _isFirst || _isAnimating ? null : _goPrevious,
+                          icon: const Icon(Icons.chevron_left_rounded),
+                          label: const Text('Previous'),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: _isLast || _isAnimating ? null : _goNext,
+                          icon: const Icon(Icons.chevron_right_rounded),
+                          label: const Text('Next'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              );
+            }
+
+            return Row(
+              children: [
+                OutlinedButton.icon(
+                  onPressed: _isFirst || _isAnimating ? null : _goPrevious,
+                  icon: const Icon(Icons.chevron_left_rounded),
+                  label: const Text('Previous'),
+                ),
+                const Spacer(),
+                OutlinedButton.icon(
+                  onPressed: _isAnimating ? null : _flip,
+                  icon: const Icon(Icons.flip_rounded),
+                  label: Text(_isFlipped ? 'Show Question' : 'Reveal Answer'),
+                ),
+                const Spacer(),
+                OutlinedButton.icon(
+                  onPressed: _isLast || _isAnimating ? null : _goNext,
+                  label: const Text('Next'),
+                  icon: const Icon(Icons.chevron_right_rounded),
+                ),
+              ],
+            );
+          },
         ),
       ),
     );

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../constants/app_constants.dart';
 import '../services/api_service.dart';
 import '../repositories/course_repository.dart';
 import '../repositories/progress_sync_repository.dart';
@@ -44,8 +45,6 @@ class _ActivityViewerScreenState extends State<ActivityViewerScreen>
   bool _hasAppFocus = true;
   bool _isInactive = false;
   bool _isCompleting = false;
-  bool _isSendingOtp = false;
-  bool _isStartingAssessment = false;
   bool _isUploadingAssignment = false;
 
   Map<String, dynamic>? _detail;
@@ -62,7 +61,6 @@ class _ActivityViewerScreenState extends State<ActivityViewerScreen>
 
   PlatformFile? _selectedAssignmentFile;
   String _assignmentNote = '';
-  String _assessmentOtp = '';
 
   @override
   void initState() {
@@ -374,58 +372,10 @@ class _ActivityViewerScreenState extends State<ActivityViewerScreen>
     );
   }
 
-  Future<void> _sendOtp() async {
-    setState(() {
-      _isSendingOtp = true;
-    });
-
-    final response = await _apiService.sendAssessmentOtp(
-      courseId: widget.courseId,
-      activityId: widget.activityId,
-    );
-
-    if (!mounted) return;
-
-    setState(() {
-      _isSendingOtp = false;
-    });
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          response?['message']?.toString() ??
-              'Unable to send OTP right now.',
-        ),
-      ),
-    );
-  }
-
-  Future<void> _startAssessment() async {
-    setState(() {
-      _isStartingAssessment = true;
-    });
-
-    final response = await _apiService.startAssessment(
-      courseId: widget.courseId,
-      activityId: widget.activityId,
-      otp: _assessmentOtp.trim().isEmpty ? null : _assessmentOtp.trim(),
-    );
-
-    if (!mounted) return;
-
-    setState(() {
-      _isStartingAssessment = false;
-    });
-
-    final redirectTo = response?['redirect_to']?.toString();
-    if (redirectTo == null || redirectTo.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Unable to start assessment.')),
-      );
-      return;
-    }
-
-    await _openUrl(redirectTo);
+  Future<void> _openAssessmentInWebApp() async {
+    final assessmentPageUrl =
+        '${AppConstants.baseUrl}/student/courses/${widget.courseId}/activities/${widget.activityId}';
+    await _openUrl(assessmentPageUrl);
   }
 
   Future<void> _openUrl(String? url) async {
@@ -484,8 +434,7 @@ class _ActivityViewerScreenState extends State<ActivityViewerScreen>
 
     return type == 'FILE' ||
         type == 'EXTERNAL_LINK' ||
-        type == 'ASSIGNMENT' ||
-        type == 'ASSESSMENT';
+      type == 'ASSIGNMENT';
   }
 
   Widget _buildContentCard({
@@ -643,7 +592,6 @@ class _ActivityViewerScreenState extends State<ActivityViewerScreen>
       case 'ASSESSMENT':
         final questions = (_detail?['questions'] as List<dynamic>? ?? []);
         final submissions = (_detail?['submissions'] as List<dynamic>? ?? []);
-        final requiresOtp = activity['assessment_require_otp'] == true;
 
         return _buildContentCard(
           title: title,
@@ -659,7 +607,7 @@ class _ActivityViewerScreenState extends State<ActivityViewerScreen>
             _buildTextPanel(
               description?.isNotEmpty == true
                   ? description!
-                  : 'Assessment details are available. Use OTP (if required) then launch assessment.',
+              : 'Assessment details are available. This must be taken in the web app.',
             ),
             const SizedBox(height: 12),
             Container(
@@ -672,46 +620,17 @@ class _ActivityViewerScreenState extends State<ActivityViewerScreen>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (requiresOtp) ...[
-                    TextField(
-                      decoration: const InputDecoration(
-                        labelText: 'OTP Code',
-                        hintText: 'Enter 6-digit OTP',
-                      ),
-                      keyboardType: TextInputType.number,
-                      onChanged: (value) {
-                        _assessmentOtp = value;
-                      },
-                    ),
-                    const SizedBox(height: 10),
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        onPressed: _isSendingOtp ? null : _sendOtp,
-                        icon: _isSendingOtp
-                            ? const SizedBox(
-                                width: 14,
-                                height: 14,
-                                child: CircularProgressIndicator(strokeWidth: 2),
-                              )
-                            : const Icon(Icons.email_outlined),
-                        label: const Text('Send OTP'),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                  ],
+                  const Text(
+                    'Assessments are only supported in the Strata LMS web app.',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 10),
                   SizedBox(
                     width: double.infinity,
                     child: FilledButton.icon(
-                      onPressed: _isStartingAssessment ? null : _startAssessment,
-                      icon: _isStartingAssessment
-                          ? const SizedBox(
-                              width: 14,
-                              height: 14,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.play_arrow_rounded),
-                      label: const Text('Start Assessment'),
+                      onPressed: _openAssessmentInWebApp,
+                      icon: const Icon(Icons.open_in_new_rounded),
+                      label: const Text('Open in Web App'),
                     ),
                   ),
                 ],
@@ -1159,79 +1078,125 @@ class _ActivityViewerScreenState extends State<ActivityViewerScreen>
                               top: BorderSide(color: Colors.grey.withOpacity(0.2)),
                             ),
                           ),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: _status == 'COMPLETED'
-                                    ? Align(
-                                        alignment: Alignment.centerLeft,
-                                        child: Container(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 10,
-                                            vertical: 8,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            color: Colors.green.withOpacity(0.1),
-                                            borderRadius: BorderRadius.circular(999),
-                                          ),
-                                          child: const Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              Icon(
-                                                Icons.check_circle_rounded,
-                                                size: 16,
-                                                color: Colors.green,
-                                              ),
-                                              SizedBox(width: 6),
-                                              Text(
-                                                'Completed',
-                                                style: TextStyle(
-                                                  fontWeight: FontWeight.w700,
-                                                  color: Colors.green,
-                                                  fontSize: 13,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      )
-                                    : Text(
-                                        activityType == 'ARTICLE' && _minimumSeconds > 0
-                                            ? '${_formatTime(minimumRemaining)} left'
-                                            : 'Time: ${_formatTime(_timeSpent)}',
-                                        style: TextStyle(
-                                          color: Colors.grey[800],
-                                          fontWeight: FontWeight.w600,
-                                          fontSize: 13,
-                                        ),
+                          child: LayoutBuilder(
+                            builder: (context, constraints) {
+                              final compact = constraints.maxWidth < 380;
+
+                              Widget statusWidget() {
+                                if (_status == 'COMPLETED') {
+                                  return Align(
+                                    alignment: Alignment.centerLeft,
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 10,
+                                        vertical: 8,
                                       ),
-                              ),
-                              const SizedBox(width: 8),
-                              if (_canManuallyComplete(activityType)) ...[
-                                OutlinedButton(
-                                  onPressed: _isCompleting ? null : _markComplete,
-                                  style: OutlinedButton.styleFrom(
-                                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                                      decoration: BoxDecoration(
+                                        color: Colors.green.withOpacity(0.1),
+                                        borderRadius: BorderRadius.circular(999),
+                                      ),
+                                      child: const Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(
+                                            Icons.check_circle_rounded,
+                                            size: 16,
+                                            color: Colors.green,
+                                          ),
+                                          SizedBox(width: 6),
+                                          Text(
+                                            'Completed',
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.w700,
+                                              color: Colors.green,
+                                              fontSize: 13,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                }
+
+                                return Text(
+                                  activityType == 'ARTICLE' && _minimumSeconds > 0
+                                      ? '${_formatTime(minimumRemaining)} left'
+                                      : 'Time: ${_formatTime(_timeSpent)}',
+                                  style: TextStyle(
+                                    color: Colors.grey[800],
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 13,
                                   ),
-                                  child: _isCompleting
-                                      ? const SizedBox(
-                                          width: 14,
-                                          height: 14,
-                                          child: CircularProgressIndicator(strokeWidth: 2),
-                                        )
-                                      : const Text('Complete'),
-                                ),
-                                const SizedBox(width: 8),
-                              ],
-                              FilledButton.icon(
-                                onPressed: _status == 'COMPLETED' ? _navigateNext : null,
-                                style: FilledButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                                ),
-                                icon: const Icon(Icons.arrow_forward_rounded, size: 18),
-                                label: const Text('Next'),
-                              ),
-                            ],
+                                );
+                              }
+
+                              if (compact) {
+                                return Column(
+                                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                                  children: [
+                                    statusWidget(),
+                                    const SizedBox(height: 8),
+                                    Row(
+                                      children: [
+                                        if (_canManuallyComplete(activityType)) ...[
+                                          Expanded(
+                                            child: OutlinedButton(
+                                              onPressed: _isCompleting ? null : _markComplete,
+                                              child: _isCompleting
+                                                  ? const SizedBox(
+                                                      width: 14,
+                                                      height: 14,
+                                                      child: CircularProgressIndicator(strokeWidth: 2),
+                                                    )
+                                                  : const Text('Complete'),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                        ],
+                                        Expanded(
+                                          child: FilledButton.icon(
+                                            onPressed: _status == 'COMPLETED' ? _navigateNext : null,
+                                            icon: const Icon(Icons.arrow_forward_rounded, size: 18),
+                                            label: const Text('Next'),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                );
+                              }
+
+                              return Row(
+                                children: [
+                                  Expanded(child: statusWidget()),
+                                  const SizedBox(width: 8),
+                                  if (_canManuallyComplete(activityType)) ...[
+                                    OutlinedButton(
+                                      onPressed: _isCompleting ? null : _markComplete,
+                                      style: OutlinedButton.styleFrom(
+                                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                                      ),
+                                      child: _isCompleting
+                                          ? const SizedBox(
+                                              width: 14,
+                                              height: 14,
+                                              child: CircularProgressIndicator(strokeWidth: 2),
+                                            )
+                                          : const Text('Complete'),
+                                    ),
+                                    const SizedBox(width: 8),
+                                  ],
+                                  FilledButton.icon(
+                                    onPressed: _status == 'COMPLETED' ? _navigateNext : null,
+                                    style: FilledButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                                    ),
+                                    icon: const Icon(Icons.arrow_forward_rounded, size: 18),
+                                    label: const Text('Next'),
+                                  ),
+                                ],
+                              );
+                            },
                           ),
                         ),
                       ),

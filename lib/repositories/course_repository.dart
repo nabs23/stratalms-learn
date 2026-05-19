@@ -5,6 +5,12 @@ import '../services/api_service.dart';
 import '../services/database_helper.dart';
 import '../services/connectivity_service.dart';
 
+enum CourseDownloadStatus {
+  notDownloaded,
+  partiallyDownloaded,
+  fullyDownloaded,
+}
+
 class CourseRepository {
   final ApiService _apiService = ApiService();
   final DatabaseHelper _dbHelper = DatabaseHelper.instance;
@@ -12,25 +18,34 @@ class CourseRepository {
 
   Future<Map<String, dynamic>?> getUser() async {
     final isOnline = await _connectivity.isOnline();
-    
+
     if (isOnline) {
       final user = await _apiService.getUser();
-      try {
-        final db = await _dbHelper.database;
-        await db.insert('courses', {
-          'id': 'user_profile',
-          'list_type': 'user',
-          'data': jsonEncode(user),
-          'updated_at': DateTime.now().millisecondsSinceEpoch,
-        }, conflictAlgorithm: ConflictAlgorithm.replace);
-      } catch (e) {
-        debugPrint('Cache user error: $e');
+      if (!kIsWeb) {
+        try {
+          final db = await _dbHelper.database;
+          await db.insert('courses', {
+            'id': 'user_profile',
+            'list_type': 'user',
+            'data': jsonEncode(user),
+            'updated_at': DateTime.now().millisecondsSinceEpoch,
+          }, conflictAlgorithm: ConflictAlgorithm.replace);
+        } catch (e) {
+          debugPrint('Cache user error: $e');
+        }
       }
       return user;
     } else {
+      if (kIsWeb) {
+        return null;
+      }
       try {
         final db = await _dbHelper.database;
-        final result = await db.query('courses', where: 'id = ?', whereArgs: ['user_profile']);
+        final result = await db.query(
+          'courses',
+          where: 'id = ?',
+          whereArgs: ['user_profile'],
+        );
         if (result.isNotEmpty) {
           final dataString = result.first['data'] as String;
           return jsonDecode(dataString) as Map<String, dynamic>;
@@ -44,43 +59,59 @@ class CourseRepository {
 
   Future<Map<String, dynamic>?> getDashboardStats() async {
     final isOnline = await _connectivity.isOnline();
-    
+
     if (isOnline) {
       final stats = await _apiService.getDashboardStats();
-      try {
-        final db = await _dbHelper.database;
-        await db.insert('courses', {
-          'id': 'dashboard_stats',
-          'list_type': 'stats',
-          'data': jsonEncode(stats),
-          'updated_at': DateTime.now().millisecondsSinceEpoch,
-        }, conflictAlgorithm: ConflictAlgorithm.replace);
+      if (!kIsWeb) {
+        try {
+          final db = await _dbHelper.database;
+          await db.insert('courses', {
+            'id': 'dashboard_stats',
+            'list_type': 'stats',
+            'data': jsonEncode(stats),
+            'updated_at': DateTime.now().millisecondsSinceEpoch,
+          }, conflictAlgorithm: ConflictAlgorithm.replace);
 
-        // Auto-download active courses in the background
-        final activeCourses = stats?['active_courses'] as List<dynamic>? ?? [];
-        for (var c in activeCourses) {
-          final id = c['course_id']?.toString();
-          if (id != null) {
-            _autoDownloadCourse(id);
+          // Auto-download active courses in the background
+          final activeCourses =
+              stats?['active_courses'] as List<dynamic>? ?? [];
+          for (var c in activeCourses) {
+            final id = c['course_id']?.toString();
+            if (id != null) {
+              _autoDownloadCourse(id);
+            }
           }
+        } catch (e) {
+          debugPrint('Cache stats error: $e');
         }
-      } catch (e) {
-        debugPrint('Cache stats error: $e');
       }
       return stats;
     } else {
+      if (kIsWeb) {
+        return null;
+      }
       try {
         final db = await _dbHelper.database;
-        final result = await db.query('courses', where: 'id = ?', whereArgs: ['dashboard_stats']);
+        final result = await db.query(
+          'courses',
+          where: 'id = ?',
+          whereArgs: ['dashboard_stats'],
+        );
         if (result.isNotEmpty) {
           final dataString = result.first['data'] as String;
           return jsonDecode(dataString) as Map<String, dynamic>;
         }
 
         // Fallback: build stats from cached overview (all courses)
-        final coursesResult = await db.query('courses', where: 'id = ?', whereArgs: ['overview']);
+        final coursesResult = await db.query(
+          'courses',
+          where: 'id = ?',
+          whereArgs: ['overview'],
+        );
         if (coursesResult.isNotEmpty) {
-          final courses = jsonDecode(coursesResult.first['data'] as String) as List<dynamic>;
+          final courses =
+              jsonDecode(coursesResult.first['data'] as String)
+                  as List<dynamic>;
           if (courses.isNotEmpty) {
             return _buildStatsFromCourses(courses);
           }
@@ -129,7 +160,7 @@ class CourseRepository {
       final progress = (course['progress'] ?? 0).toDouble();
       totalProgress += progress;
       final isCompleted = course['is_completed'] == true || progress >= 100;
-      
+
       if (isCompleted) {
         completedCount++;
         completedCourses.add(course);
@@ -155,11 +186,15 @@ class CourseRepository {
     };
   }
 
-  Future<List<dynamic>> getStudentCourses({bool includeCompleted = true}) async {
+  Future<List<dynamic>> getStudentCourses({
+    bool includeCompleted = true,
+  }) async {
     final isOnline = await _connectivity.isOnline();
-    
+
     if (isOnline) {
-      final courses = await _apiService.getStudentCourses(includeCompleted: includeCompleted);
+      final courses = await _apiService.getStudentCourses(
+        includeCompleted: includeCompleted,
+      );
       // Cache the result
       try {
         final db = await _dbHelper.database;
@@ -172,7 +207,8 @@ class CourseRepository {
 
         // Auto-download active courses in the background
         for (var c in courses) {
-          final isCompleted = c['is_completed'] == true || (c['progress'] ?? 0) >= 100;
+          final isCompleted =
+              c['is_completed'] == true || (c['progress'] ?? 0) >= 100;
           if (!isCompleted) {
             final id = c['course_id']?.toString();
             if (id != null) {
@@ -188,7 +224,11 @@ class CourseRepository {
       // Offline fallback
       try {
         final db = await _dbHelper.database;
-        final result = await db.query('courses', where: 'id = ?', whereArgs: ['overview']);
+        final result = await db.query(
+          'courses',
+          where: 'id = ?',
+          whereArgs: ['overview'],
+        );
         if (result.isNotEmpty) {
           final dataString = result.first['data'] as String;
           return jsonDecode(dataString) as List<dynamic>;
@@ -225,7 +265,7 @@ class CourseRepository {
 
   Future<Map<String, dynamic>?> getStudentCourseTree(String courseId) async {
     final isOnline = await _connectivity.isOnline();
-    
+
     if (isOnline) {
       final tree = await _apiService.getStudentCourseTree(courseId);
       if (tree != null) {
@@ -245,7 +285,11 @@ class CourseRepository {
       // Offline fallback
       try {
         final db = await _dbHelper.database;
-        final result = await db.query('course_trees', where: 'course_id = ?', whereArgs: [courseId]);
+        final result = await db.query(
+          'course_trees',
+          where: 'course_id = ?',
+          whereArgs: [courseId],
+        );
         if (result.isNotEmpty) {
           final dataString = result.first['data'] as String;
           return jsonDecode(dataString) as Map<String, dynamic>;
@@ -262,9 +306,12 @@ class CourseRepository {
     required String activityId,
   }) async {
     final isOnline = await _connectivity.isOnline();
-    
+
     if (isOnline) {
-      final activity = await _apiService.getStudentActivityDetail(courseId: courseId, activityId: activityId);
+      final activity = await _apiService.getStudentActivityDetail(
+        courseId: courseId,
+        activityId: activityId,
+      );
       if (activity != null) {
         try {
           final db = await _dbHelper.database;
@@ -283,7 +330,11 @@ class CourseRepository {
       // Offline fallback
       try {
         final db = await _dbHelper.database;
-        final result = await db.query('activities', where: 'activity_id = ?', whereArgs: [activityId]);
+        final result = await db.query(
+          'activities',
+          where: 'activity_id = ?',
+          whereArgs: [activityId],
+        );
         if (result.isNotEmpty) {
           final dataString = result.first['data'] as String;
           return jsonDecode(dataString) as Map<String, dynamic>;
@@ -304,34 +355,116 @@ class CourseRepository {
     if (tree == null) return;
 
     // 2. Extract all activity IDs
-    final List<String> activityIds = [];
-    final units = tree['units'] as List<dynamic>? ?? [];
-    for (var unit in units) {
-      final activities = unit['activities'] as List<dynamic>? ?? [];
-      for (var activity in activities) {
-        final id = activity['activity_id']?.toString();
-        if (id != null) {
-          activityIds.add(id);
-        }
-      }
-    }
+    final activityIds = _extractActivityIdsFromTree(tree);
 
     // 3. Fetch all activity details
     for (var activityId in activityIds) {
-      await getStudentActivityDetail(courseId: courseId, activityId: activityId);
+      await getStudentActivityDetail(
+        courseId: courseId,
+        activityId: activityId,
+      );
       // Wait a bit to not overwhelm the API
       await Future.delayed(const Duration(milliseconds: 100));
     }
   }
 
-  Future<bool> isCourseDownloaded(String courseId) async {
+  List<String> _extractActivityIdsFromTree(Map<String, dynamic> tree) {
+    final activityIds = <String>{};
+
+    final units = tree['units'] as List<dynamic>? ?? [];
+    for (final unit in units) {
+      final activities =
+          (unit as Map<String, dynamic>)['activities'] as List<dynamic>? ?? [];
+      for (final activity in activities) {
+        final activityMap = activity as Map<String, dynamic>;
+        final id =
+            activityMap['id']?.toString() ??
+            activityMap['activity_id']?.toString();
+        if (id != null && id.isNotEmpty) {
+          activityIds.add(id);
+        }
+      }
+    }
+
+    final sections = tree['sections'] as List<dynamic>? ?? [];
+    for (final section in sections) {
+      _collectSectionActivityIds(section as Map<String, dynamic>, activityIds);
+    }
+
+    return activityIds.toList();
+  }
+
+  void _collectSectionActivityIds(
+    Map<String, dynamic> section,
+    Set<String> activityIds,
+  ) {
+    final activities = section['activities'] as List<dynamic>? ?? [];
+    for (final activity in activities) {
+      final activityMap = activity as Map<String, dynamic>;
+      final id =
+          activityMap['id']?.toString() ??
+          activityMap['activity_id']?.toString();
+      if (id != null && id.isNotEmpty) {
+        activityIds.add(id);
+      }
+    }
+
+    final children = section['children'] as List<dynamic>? ?? [];
+    for (final child in children) {
+      _collectSectionActivityIds(child as Map<String, dynamic>, activityIds);
+    }
+  }
+
+  Future<CourseDownloadStatus> getCourseDownloadStatus(String courseId) async {
     try {
       final db = await _dbHelper.database;
-      final result = await db.query('course_trees', where: 'course_id = ?', whereArgs: [courseId]);
-      return result.isNotEmpty;
+      final treeRows = await db.query(
+        'course_trees',
+        where: 'course_id = ?',
+        whereArgs: [courseId],
+      );
+
+      if (treeRows.isEmpty) {
+        return CourseDownloadStatus.notDownloaded;
+      }
+
+      final treeDataString = treeRows.first['data'] as String;
+      final treeData = jsonDecode(treeDataString) as Map<String, dynamic>;
+      final activityIds = _extractActivityIdsFromTree(treeData);
+
+      if (activityIds.isEmpty) {
+        return CourseDownloadStatus.fullyDownloaded;
+      }
+
+      final activityRows = await db.query(
+        'activities',
+        columns: ['activity_id'],
+        where: 'course_id = ?',
+        whereArgs: [courseId],
+      );
+
+      if (activityRows.isEmpty) {
+        return CourseDownloadStatus.partiallyDownloaded;
+      }
+
+      final cachedActivityIds = activityRows
+          .map((row) => row['activity_id']?.toString())
+          .whereType<String>()
+          .toSet();
+
+      final hasAllActivities = activityIds.every(cachedActivityIds.contains);
+
+      return hasAllActivities
+          ? CourseDownloadStatus.fullyDownloaded
+          : CourseDownloadStatus.partiallyDownloaded;
     } catch (e) {
-      return false;
+      return CourseDownloadStatus.notDownloaded;
     }
+  }
+
+  Future<bool> isCourseDownloaded(String courseId) async {
+    return (await getCourseDownloadStatus(courseId)) ==
+        CourseDownloadStatus.fullyDownloaded;
   }
 
   // Helper for silent background downloads
@@ -347,5 +480,3 @@ class CourseRepository {
     }
   }
 }
-
-

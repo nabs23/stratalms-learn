@@ -82,7 +82,7 @@ class SlidesHeader extends StatelessWidget {
                     ],
                   ),
                 ),
-                _buildActions(),
+                _buildActions(context),
               ],
             ),
           ),
@@ -92,46 +92,54 @@ class SlidesHeader extends StatelessWidget {
     );
   }
 
-  Widget _buildActions() {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        if (hasAudio) ...[
-          HeaderIconButton(
-            icon: isAudioEnabled
-                ? Icons.volume_up_rounded
-                : Icons.volume_off_rounded,
-            active: isAudioEnabled,
-            onTap: onToggleAudio,
-            tooltip: isAudioEnabled ? 'Mute audio' : 'Unmute audio',
-          ),
-          const SizedBox(width: 4),
-          HeaderIconButton(
-            icon: isAudioPlaying
-                ? Icons.pause_rounded
-                : Icons.play_arrow_rounded,
-            active: isAudioEnabled,
-            onTap: isAudioEnabled ? onTogglePlayPause : null,
-            tooltip: isAudioPlaying ? 'Pause' : 'Play',
-          ),
-          const SizedBox(width: 4),
-          HeaderIconButton(
-            icon: Icons.fast_forward_rounded,
-            active: autoAdvance,
-            onTap: isAudioEnabled ? onToggleAutoAdvance : null,
-            tooltip: autoAdvance ? 'Disable auto-advance' : 'Auto-advance',
-          ),
-        ],
-        if (hasImage) ...[
-          const SizedBox(width: 4),
-          HeaderIconButton(
-            icon: Icons.fit_screen_rounded,
-            active: false,
-            onTap: onCycleImageFit,
-            tooltip: 'Cycle image fit',
-          ),
-        ],
+  Widget _buildActions(BuildContext context) {
+    final actions = <Widget>[
+      if (hasAudio) ...[
+        HeaderIconButton(
+          icon: isAudioEnabled
+              ? Icons.volume_up_rounded
+              : Icons.volume_off_rounded,
+          active: isAudioEnabled,
+          onTap: onToggleAudio,
+          tooltip: isAudioEnabled ? 'Mute audio' : 'Unmute audio',
+        ),
+        const SizedBox(width: 4),
+        HeaderIconButton(
+          icon: isAudioPlaying
+              ? Icons.pause_rounded
+              : Icons.play_arrow_rounded,
+          active: isAudioEnabled,
+          onTap: isAudioEnabled ? onTogglePlayPause : null,
+          tooltip: isAudioPlaying ? 'Pause' : 'Play',
+        ),
+        const SizedBox(width: 4),
+        HeaderIconButton(
+          icon: Icons.fast_forward_rounded,
+          active: autoAdvance,
+          onTap: isAudioEnabled ? onToggleAutoAdvance : null,
+          tooltip: autoAdvance ? 'Disable auto-advance' : 'Auto-advance',
+        ),
       ],
+      if (hasImage) ...[
+        const SizedBox(width: 4),
+        HeaderIconButton(
+          icon: Icons.fit_screen_rounded,
+          active: false,
+          onTap: onCycleImageFit,
+          tooltip: 'Cycle image fit',
+        ),
+      ],
+    ];
+
+    return ConstrainedBox(
+      constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.42),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: actions,
+        ),
+      ),
     );
   }
 

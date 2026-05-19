@@ -20,7 +20,7 @@ class _CoursesScreenState extends State<CoursesScreen> {
   Map<String, dynamic>? _overview;
   List<dynamic> _activeCourses = [];
   List<dynamic> _completedCourses = [];
-  Set<String> _downloadedCourseIds = {};
+  Map<String, CourseDownloadStatus> _courseDownloadStatuses = {};
 
   @override
   void initState() {
@@ -42,17 +42,17 @@ class _CoursesScreenState extends State<CoursesScreen> {
     final active = data?['active_courses'] as List<dynamic>? ?? [];
     final completed = data?['completed_courses'] as List<dynamic>? ?? [];
 
-    final downloadedIds = <String>{};
+    final downloadStatuses = <String, CourseDownloadStatus>{};
     for (final c in active) {
       final id = c['course_id']?.toString();
-      if (id != null && await _courseRepo.isCourseDownloaded(id)) {
-        downloadedIds.add(id);
+      if (id != null) {
+        downloadStatuses[id] = await _courseRepo.getCourseDownloadStatus(id);
       }
     }
     for (final c in completed) {
       final id = c['course_id']?.toString();
-      if (id != null && await _courseRepo.isCourseDownloaded(id)) {
-        downloadedIds.add(id);
+      if (id != null) {
+        downloadStatuses[id] = await _courseRepo.getCourseDownloadStatus(id);
       }
     }
 
@@ -62,7 +62,7 @@ class _CoursesScreenState extends State<CoursesScreen> {
       _overview = data?['overview'] as Map<String, dynamic>?;
       _activeCourses = active;
       _completedCourses = completed;
-      _downloadedCourseIds = downloadedIds;
+      _courseDownloadStatuses = downloadStatuses;
       _isLoading = false;
     });
   }
@@ -92,35 +92,76 @@ class _CoursesScreenState extends State<CoursesScreen> {
     final completed = _overview?['completed_courses']?.toString() ?? '0';
     final avgProgress = '${_overview?['avg_progress'] ?? 0}%';
 
-    return Row(
-      children: [
-        Expanded(
-          child: _buildMiniStatCard(
-            title: 'Active',
-            value: active,
-            icon: Icons.play_circle_fill_rounded,
-            color: const Color(0xFF3B82F6),
-          ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: _buildMiniStatCard(
-            title: 'Completed',
-            value: completed,
-            icon: Icons.verified_rounded,
-            color: const Color(0xFF10B981),
-          ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: _buildMiniStatCard(
-            title: 'Avg Progress',
-            value: avgProgress,
-            icon: Icons.trending_up_rounded,
-            color: const Color(0xFF8B5CF6),
-          ),
-        ),
-      ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < 360;
+
+        if (!compact) {
+          return Row(
+            children: [
+              Expanded(
+                child: _buildMiniStatCard(
+                  title: 'Active',
+                  value: active,
+                  icon: Icons.play_circle_fill_rounded,
+                  color: const Color(0xFF3B82F6),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _buildMiniStatCard(
+                  title: 'Completed',
+                  value: completed,
+                  icon: Icons.verified_rounded,
+                  color: const Color(0xFF10B981),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _buildMiniStatCard(
+                  title: 'Avg Progress',
+                  value: avgProgress,
+                  icon: Icons.trending_up_rounded,
+                  color: const Color(0xFF8B5CF6),
+                ),
+              ),
+            ],
+          );
+        }
+
+        return Column(
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: _buildMiniStatCard(
+                    title: 'Active',
+                    value: active,
+                    icon: Icons.play_circle_fill_rounded,
+                    color: const Color(0xFF3B82F6),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _buildMiniStatCard(
+                    title: 'Completed',
+                    value: completed,
+                    icon: Icons.verified_rounded,
+                    color: const Color(0xFF10B981),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            _buildMiniStatCard(
+              title: 'Avg Progress',
+              value: avgProgress,
+              icon: Icons.trending_up_rounded,
+              color: const Color(0xFF8B5CF6),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -164,7 +205,11 @@ class _CoursesScreenState extends State<CoursesScreen> {
     final progress = (course['progress'] ?? 0).toDouble();
     final grade = course['grade'];
     final courseId = course['course_id']?.toString();
-    final isDownloaded = courseId != null && _downloadedCourseIds.contains(courseId);
+    final downloadStatus = courseId == null
+      ? CourseDownloadStatus.notDownloaded
+      : (_courseDownloadStatuses[courseId] ?? CourseDownloadStatus.notDownloaded);
+    final isFullyDownloaded = downloadStatus == CourseDownloadStatus.fullyDownloaded;
+    final isPartiallyDownloaded = downloadStatus == CourseDownloadStatus.partiallyDownloaded;
 
     return InkWell(
       borderRadius: BorderRadius.circular(20),
@@ -222,19 +267,25 @@ class _CoursesScreenState extends State<CoursesScreen> {
                       ),
               ),
             ),
-            if (isDownloaded)
+            if (isFullyDownloaded || isPartiallyDownloaded)
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(vertical: 4),
-                color: Colors.deepPurple,
-                child: const Row(
+                color: isFullyDownloaded ? Colors.deepPurple : Colors.orange,
+                child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.offline_pin_rounded, size: 12, color: Colors.white),
-                    SizedBox(width: 4),
+                    Icon(
+                      isFullyDownloaded
+                          ? Icons.offline_pin_rounded
+                          : Icons.downloading_rounded,
+                      size: 12,
+                      color: Colors.white,
+                    ),
+                    const SizedBox(width: 4),
                     Text(
-                      'Available Offline',
-                      style: TextStyle(
+                      isFullyDownloaded ? 'Downloaded' : 'Partially Downloaded',
+                      style: const TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.w700,
                         color: Colors.white,

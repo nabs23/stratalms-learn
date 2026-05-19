@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
-import '../repositories/course_repository.dart';
-import '../services/connectivity_service.dart';
-import '../utils/responsive.dart';
-import '../constants/app_constants.dart';
+import '../../repositories/course_repository.dart';
+import '../../services/connectivity_service.dart';
+import '../../constants/app_constants.dart';
+import '../course_detail_screen.dart';
+import 'widgets/announcements_section.dart';
+import 'widgets/active_courses_section.dart';
+import 'widgets/recent_activity_section.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -16,7 +19,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final _connectivityService = ConnectivityService();
   Map<String, dynamic>? _user;
   Map<String, dynamic>? _stats;
-  Set<String> _downloadedCourseIds = {};
+  Map<String, CourseDownloadStatus> _courseDownloadStatuses = {};
   bool _isLoading = true;
   bool _isOffline = false;
 
@@ -32,11 +35,11 @@ class _HomeScreenState extends State<HomeScreen> {
     final stats = await _courseRepo.getDashboardStats();
 
     final active = stats?['active_courses'] as List<dynamic>? ?? [];
-    final downloadedIds = <String>{};
+    final downloadStatuses = <String, CourseDownloadStatus>{};
     for (final c in active) {
       final id = c['course_id']?.toString();
-      if (id != null && await _courseRepo.isCourseDownloaded(id)) {
-        downloadedIds.add(id);
+      if (id != null) {
+        downloadStatuses[id] = await _courseRepo.getCourseDownloadStatus(id);
       }
     }
 
@@ -45,7 +48,7 @@ class _HomeScreenState extends State<HomeScreen> {
         _isOffline = !isOnline;
         _user = user;
         _stats = stats;
-        _downloadedCourseIds = downloadedIds;
+        _courseDownloadStatuses = downloadStatuses;
         _isLoading = false;
       });
     }
@@ -314,275 +317,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildActiveCourses(List<dynamic> courses) {
-    if (courses.isEmpty) {
-      return const Padding(
-        padding: EdgeInsets.symmetric(vertical: 20),
-        child: Center(
-          child: Text(
-            'No active courses.',
-            style: TextStyle(color: Colors.grey),
-          ),
-        ),
-      );
-    }
-
-    return SizedBox(
-      height: 220,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        clipBehavior: Clip.none,
-        itemCount: courses.length,
-        itemBuilder: (context, index) {
-          final course = courses[index];
-          final courseId = course['course_id']?.toString();
-          final isDownloaded = courseId != null && _downloadedCourseIds.contains(courseId);
-
-          return Container(
-            width: 260,
-            margin: const EdgeInsets.only(right: 20),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 10,
-                  offset: const Offset(0, 5),
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                ClipRRect(
-                  borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(20),
-                  ),
-                  child: Container(
-                    height: 120,
-                    width: double.infinity,
-                    color: Colors.grey[200],
-                    child:
-                        (course['image'] != null &&
-                            course['image'].toString().isNotEmpty)
-                        ? Image.network(
-                            _getImageUrl(course['image']),
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) {
-                              debugPrint('Home image load error (${_getImageUrl(course["image"])}): $error');
-                              return const Icon(
-                                Icons.image_outlined,
-                                size: 40,
-                                color: Colors.grey,
-                              );
-                            },
-                          )
-                        : const Icon(
-                            Icons.image_outlined,
-                            size: 40,
-                            color: Colors.grey,
-                          ),
-                  ),
-                ),
-                if (isDownloaded)
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(vertical: 4),
-                    color: Colors.deepPurple,
-                    child: const Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.offline_pin_rounded, size: 10, color: Colors.white),
-                        SizedBox(width: 4),
-                        Text(
-                          'Available Offline',
-                          style: TextStyle(
-                            fontSize: 9,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        course['title'] ?? 'Course Title',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 15,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(4),
-                              child: LinearProgressIndicator(
-                                value: (course['progress'] ?? 0) / 100,
-                                minHeight: 6,
-                                backgroundColor: Colors.grey[200],
-                                valueColor: const AlwaysStoppedAnimation<Color>(
-                                  Colors.deepPurple,
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Text(
-                            '${course['progress']}%',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.deepPurple,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildRecentActivity(List<dynamic> activities) {
-    if (activities.isEmpty) {
-      return const Padding(
-        padding: EdgeInsets.symmetric(vertical: 20),
-        child: Center(
-          child: Text(
-            'No recent activity.',
-            style: TextStyle(color: Colors.grey),
-          ),
-        ),
-      );
-    }
-
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.03),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: ListView.separated(
-        padding: EdgeInsets.zero,
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        itemCount: activities.length,
-        separatorBuilder: (context, index) =>
-            const Divider(height: 1, indent: 64, color: Color(0xFFEEEEEE)),
-        itemBuilder: (context, index) {
-          final activity = activities[index];
-          return ListTile(
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 20,
-              vertical: 8,
-            ),
-            leading: Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: Colors.blue.withOpacity(0.1),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.history_rounded,
-                color: Colors.blue,
-                size: 20,
-              ),
-            ),
-            title: Text(
-              activity['activity_title'] ?? 'Activity',
-              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
-            ),
-            subtitle: Text(
-              activity['course_title'] ?? 'Course',
-              style: TextStyle(color: Colors.grey[600], fontSize: 13),
-            ),
-            trailing: Text(
-              activity['completed_at'] ?? '',
-              style: const TextStyle(fontSize: 12, color: Colors.grey),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildAnnouncements(List<dynamic> announcements) {
-    if (announcements.isEmpty) {
-      return const Padding(
-        padding: EdgeInsets.symmetric(vertical: 20),
-        child: Center(
-          child: Text(
-            'No announcements.',
-            style: TextStyle(color: Colors.grey),
-          ),
-        ),
-      );
-    }
-
-    return Column(
-      children: announcements.map((announcement) {
-        return Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          decoration: BoxDecoration(
-            color: Colors.orange.withOpacity(0.05),
-            border: Border.all(color: Colors.orange.withOpacity(0.2)),
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: ListTile(
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 20,
-              vertical: 12,
-            ),
-            leading: Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: Colors.orange.withOpacity(0.15),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.campaign_rounded,
-                color: Colors.orange,
-                size: 20,
-              ),
-            ),
-            title: Text(
-              announcement['title'] ?? 'Announcement',
-              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
-            ),
-            subtitle: Padding(
-              padding: const EdgeInsets.only(top: 4.0),
-              child: Text(
-                announcement['published_at'] ?? '',
-                style: TextStyle(color: Colors.grey[600], fontSize: 13),
-              ),
-            ),
-          ),
-        );
-      }).toList(),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -594,7 +328,11 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.wifi_off_rounded, size: 48, color: Colors.grey),
+                  const Icon(
+                    Icons.wifi_off_rounded,
+                    size: 48,
+                    color: Colors.grey,
+                  ),
                   const SizedBox(height: 16),
                   const Text(
                     'You are offline',
@@ -618,7 +356,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     SliverToBoxAdapter(
                       child: Container(
                         margin: const EdgeInsets.fromLTRB(24, 16, 24, 0),
-                        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 12,
+                          horizontal: 16,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.orange.shade50,
                           borderRadius: BorderRadius.circular(12),
@@ -632,7 +373,11 @@ class _HomeScreenState extends State<HomeScreen> {
                                 color: Colors.orange.shade100,
                                 shape: BoxShape.circle,
                               ),
-                              child: Icon(Icons.wifi_off_rounded, size: 20, color: Colors.orange.shade800),
+                              child: Icon(
+                                Icons.wifi_off_rounded,
+                                size: 20,
+                                color: Colors.orange.shade800,
+                              ),
                             ),
                             const SizedBox(width: 16),
                             Expanded(
@@ -672,15 +417,34 @@ class _HomeScreenState extends State<HomeScreen> {
                         const SizedBox(height: 32),
                         _buildSectionHeader('Continue Learning'),
                         const SizedBox(height: 16),
-                        _buildActiveCourses(_stats!['active_courses'] ?? []),
+                        ActiveCoursesSection(
+                          courses: _stats!['active_courses'] ?? [],
+                          courseDownloadStatuses: _courseDownloadStatuses,
+                          imageUrlBuilder: _getImageUrl,
+                          onCourseTap: (course) {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => CourseDetailScreen(
+                                  course: Map<String, dynamic>.from(course),
+                                  isCompleted: false,
+                                  imageUrlBuilder: _getImageUrl,
+                                ),
+                              ),
+                            );
+                          },
+                        ),
                         const SizedBox(height: 32),
                         _buildSectionHeader('Recent Activity'),
                         const SizedBox(height: 16),
-                        _buildRecentActivity(_stats!['recent_activity'] ?? []),
+                        RecentActivitySection(
+                          activities: _stats!['recent_activity'] ?? [],
+                        ),
                         const SizedBox(height: 32),
                         _buildSectionHeader('Announcements'),
                         const SizedBox(height: 16),
-                        _buildAnnouncements(_stats!['announcements'] ?? []),
+                        AnnouncementsSection(
+                          announcements: _stats!['announcements'] ?? [],
+                        ),
                         const SizedBox(height: 40),
                       ]),
                     ),
